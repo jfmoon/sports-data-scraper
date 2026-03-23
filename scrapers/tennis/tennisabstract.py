@@ -21,7 +21,7 @@ import os
 import subprocess
 import sys
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 
 from pydantic import BaseModel, Field
 from base.scraper import BaseScraper
@@ -87,7 +87,7 @@ class WtaPlayer(BaseModel):
     lastUpdated:      str = ""
     ratings:          PlayerRatings = Field(default_factory=PlayerRatings)
     elo:              EloRatings = Field(default_factory=EloRatings)
-    recentMatches:    List[Dict[str, Any]] = Field(default_factory=list)
+    recentMatches:    List[RecentMatch] = Field(default_factory=list)
     dataAvailability: DataAvailability = Field(default_factory=DataAvailability)
 
 
@@ -157,6 +157,9 @@ class TennisAbstractScraper(BaseScraper):
             hard_errors = ranked_data.get("errors", [])
         else:
             print("  ❌ Critical: ranked list fetch failed")
+
+        if not all_players:
+            print("  [CRITICAL] Ranked fetch returned 0 players — possible site outage or bot block.")
 
         scraped_slugs = {p["slug"] for p in all_players}
 
