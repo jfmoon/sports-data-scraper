@@ -1,6 +1,6 @@
 groups:
-  cbb: [espn, action_network, kenpom, evanmiya]
-  tennis: [sofascore, the_odds_api]
+  cbb:    [espn, action_network, kenpom, evanmiya]
+  tennis: [sofascore, the_odds_api, tennisabstract]
 
 scrapers:
   espn:
@@ -24,6 +24,8 @@ scrapers:
     bucket: sports-data-scraper-491116
     gcs_object: cbb/kenpom.json
     top: 68
+    fanmatch: false
+    fanmatch_date: null
 
   evanmiya:
     name: evanmiya
@@ -45,3 +47,12 @@ scrapers:
     sport: tennis
     bucket: sports-data-scraper-491116
     gcs_object: tennis/odds.json
+
+  tennisabstract:
+    name: tennisabstract
+    enabled: true
+    sport: tennis
+    bucket: sports-data-scraper-491116
+    gcs_object: tennis/players.json
+    top: 100
+    slug: null
