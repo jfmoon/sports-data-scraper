@@ -10,10 +10,12 @@ After the scrape completes it:
   2. Writes parsed     → GCS: tennis/players.json
 
 Config keys (in config.yaml under tennisabstract):
-  top: 100                # number of top-ranked players to scrape
+  top: 250                # number of top-ranked players to scrape
   slug: null              # single player slug for testing (e.g. IgaSwiatek)
-  priority_players:       # always scraped regardless of ranking
+  priority_players:       # always scraped, failure = hard error
     - {name: "Emma Raducanu", slug: "EmmaRaducanu"}
+  optional_players:       # always attempted, failure = warning only
+    - {name: "Danielle Collins", slug: "DanielleCollins"}
 """
 
 import json
@@ -33,39 +35,47 @@ TENNISABSTRACT_SCRAPER = os.path.join(
 
 class TennisAbstractScraper(BaseScraper):
 
+    def _run_single(self, slug, out_path, env):
+        """Run scraper for one player slug. Returns parsed data dict or None."""
+        env = {**env, "OUTPUT_PATH": out_path, "TOP_N": "0"}
+        try:
+            subprocess.run(
+                [sys.executable, TENNISABSTRACT_SCRAPER, slug],
+                check=True, env=env
+            )
+            with open(out_path, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"  ⚠️  Failed {slug}: {e}")
+            return None
+
     def fetch(self):
-        top              = self.config.get("top", 100)
+        top              = self.config.get("top", 250)
         slug             = self.config.get("slug", None)
         priority_players = self.config.get("priority_players", [])
+        optional_players = self.config.get("optional_players", [])
         date_str         = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         ts_str           = datetime.now(timezone.utc).strftime("%H%M%S")
         out_dir          = f"data/raw/tennisabstract/{date_str}"
         os.makedirs(out_dir, exist_ok=True)
 
-        env = os.environ.copy()
-        env["GCS_BUCKET"] = self.config.get("bucket", "")
-
-        all_results = []
-        errors      = []
+        base_env = os.environ.copy()
+        base_env["GCS_BUCKET"] = self.config.get("bucket", "")
 
         # ── Single-player test mode ───────────────────────────────────────────
         if slug:
             out_path = f"{out_dir}/players_{ts_str}.json"
-            env["OUTPUT_PATH"] = out_path
-            env["TOP_N"]       = "0"
             print(f"\n[TennisAbstract] Single player mode: {slug}")
-            subprocess.run([sys.executable, TENNISABSTRACT_SCRAPER, slug],
-                           check=True, env=env)
-            with open(out_path, "r") as f:
-                data = json.load(f)
+            data = self._run_single(slug, out_path, base_env)
+            if not data:
+                raise RuntimeError(f"Failed to scrape single player: {slug}")
             self._raw_path = out_path
             self._raw_mode = "players"
             return {"mode": "players", "path": out_path, "data": data}
 
-        # ── Normal mode: top N rankings ───────────────────────────────────────
+        # ── Step 1: top N by ranking ──────────────────────────────────────────
         ranked_path = f"{out_dir}/ranked_{ts_str}.json"
-        env["OUTPUT_PATH"] = ranked_path
-        env["TOP_N"]       = str(top)
+        env = {**base_env, "OUTPUT_PATH": ranked_path, "TOP_N": str(top)}
         print(f"\n[TennisAbstract] Scraping top {top} WTA players...")
         subprocess.run([sys.executable, TENNISABSTRACT_SCRAPER],
                        check=True, env=env)
@@ -73,49 +83,59 @@ class TennisAbstractScraper(BaseScraper):
         with open(ranked_path, "r") as f:
             ranked_data = json.load(f)
 
-        ranked_slugs = {p["slug"] for p in ranked_data.get("players", [])}
         all_results  = ranked_data.get("players", [])
-        errors       = ranked_data.get("errors", [])
+        hard_errors  = ranked_data.get("errors", [])
+        soft_warns   = []
+        ranked_slugs = {p["slug"] for p in all_results}
 
-        # ── Priority players not already in top N ─────────────────────────────
+        # ── Step 2: priority players not in top N (hard failures) ─────────────
         extras = [p for p in priority_players if p["slug"] not in ranked_slugs]
         if extras:
-            print(f"\n[TennisAbstract] Scraping {len(extras)} priority players not in top {top}...")
-            for i, player in enumerate(extras):
-                extra_path = f"{out_dir}/priority_{player['slug']}_{ts_str}.json"
-                env["OUTPUT_PATH"] = extra_path
-                env["TOP_N"]       = "0"
-                try:
-                    subprocess.run(
-                        [sys.executable, TENNISABSTRACT_SCRAPER, player["slug"]],
-                        check=True, env=env
-                    )
-                    with open(extra_path, "r") as f:
-                        extra_data = json.load(f)
-                    players = extra_data.get("players", [])
-                    if players:
-                        all_results.extend(players)
-                        print(f"  ✅ {player['name']}")
-                    else:
-                        errors.append(player["name"])
-                except Exception as e:
-                    print(f"  ❌ Failed {player['name']}: {e}")
-                    errors.append(player["name"])
+            print(f"\n[TennisAbstract] {len(extras)} priority players outside top {top}...")
+            for player in extras:
+                out_path = f"{out_dir}/priority_{player['slug']}_{ts_str}.json"
+                data = self._run_single(player["slug"], out_path, base_env)
+                if data and data.get("players"):
+                    all_results.extend(data["players"])
+                    ranked_slugs.add(player["slug"])
+                    print(f"  ✅ {player['name']}")
+                else:
+                    hard_errors.append(player["name"])
+                    print(f"  ❌ {player['name']} (hard error)")
 
-        # ── Write merged output file ──────────────────────────────────────────
+        # ── Step 3: optional players not yet scraped (soft failures) ──────────
+        optionals = [p for p in optional_players if p["slug"] not in ranked_slugs]
+        if optionals:
+            print(f"\n[TennisAbstract] {len(optionals)} optional players outside top {top}...")
+            for player in optionals:
+                out_path = f"{out_dir}/optional_{player['slug']}_{ts_str}.json"
+                data = self._run_single(player["slug"], out_path, base_env)
+                if data and data.get("players"):
+                    all_results.extend(data["players"])
+                    print(f"  ✅ {player['name']}")
+                else:
+                    soft_warns.append(player["name"])
+                    print(f"  ⚠️  {player['name']} (sparse/inactive page — skipped)")
+
+        # ── Write merged output ───────────────────────────────────────────────
         merged_path = f"{out_dir}/players_{ts_str}.json"
         merged = {
             "lastUpdated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             "playerCount": len(all_results),
             "players":     all_results,
-            "errors":      errors,
+            "errors":      hard_errors,
+            "warnings":    soft_warns,
         }
         with open(merged_path, "w") as f:
             json.dump(merged, f, indent=2)
 
+        if soft_warns:
+            print(f"\n[TennisAbstract] ⚠️  Skipped (inactive/sparse): {', '.join(soft_warns)}")
+        if hard_errors:
+            print(f"[TennisAbstract] ❌ Failed: {', '.join(hard_errors)}")
+
         self._raw_path = merged_path
         self._raw_mode = "players"
-
         return {"mode": "players", "path": merged_path, "data": merged}
 
     def content_key(self, raw):

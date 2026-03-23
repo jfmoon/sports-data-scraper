@@ -54,7 +54,7 @@ scrapers:
     sport: tennis
     bucket: sports-data-scraper-491116
     gcs_object: tennis/players.json
-    top: 100
+    top: 250
     slug: null
     priority_players:
       - {name: "Jessica Pegula",       slug: "JessicaPegula"}
@@ -85,3 +85,8 @@ scrapers:
       - {name: "Ekaterina Reyngold",   slug: "EkaterinaReyngold"}
       - {name: "Yuliia Starodubtseva", slug: "YuliiaStarodubtseva"}
       - {name: "Wakana Sonobe",        slug: "WakanaSonobe"}
+    # Players with sparse/inactive TA pages — failures logged as warnings not errors
+    optional_players:
+      - {name: "Danielle Collins",  slug: "DanielleCollins"}
+      - {name: "Sloane Stephens",   slug: "SloaneStephens"}
+      - {name: "Sofia Kenin",       slug: "SofiaKenin"}
