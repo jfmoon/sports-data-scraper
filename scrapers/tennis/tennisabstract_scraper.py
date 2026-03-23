@@ -337,38 +337,37 @@ def get_table_career_row(tables: list, *required_columns: str) -> dict:
 
 def fetch_player_page(slug: str) -> Optional[BeautifulSoup]:
     """
-    Fetch a Tennis Abstract player page using Playwright (real browser).
-    Falls back to curl_cffi if Playwright is not available.
+    Fetch a Tennis Abstract player page.
+    curl_cffi first (fast, low memory) — Playwright fallback only if blocked.
+    Player pages are static HTML so curl_cffi handles them 95%+ of the time.
     """
     url = f"https://www.tennisabstract.com/cgi-bin/wplayer.cgi?p={slug}"
+
+    # ── Primary: curl_cffi (Chrome impersonation, no browser overhead) ────────
+    try:
+        resp = cf_requests.get(url, impersonate="chrome120", timeout=15)
+        if resp.status_code == 200 and "Career" in resp.text:
+            return BeautifulSoup(resp.text, "html.parser")
+        print(f"  ⚠️  curl_cffi: unexpected response for {slug} (status {resp.status_code})")
+    except Exception as e:
+        print(f"  ⚠️  curl_cffi failed for {slug}: {e}", file=sys.stderr)
+
+    # ── Fallback: Playwright (only if curl_cffi is blocked or fails) ──────────
     try:
         from playwright.sync_api import sync_playwright
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            context = browser.new_context(
-                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                           "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            )
-            page = context.new_page()
-            page.goto(url, wait_until="domcontentloaded", timeout=30000)
-            # Wait for the key stats table to appear
-            page.wait_for_selector("table", timeout=20000)
+            page = browser.new_page()
+            page.goto(url, wait_until="networkidle", timeout=30000)
             html = page.content()
             browser.close()
-        return BeautifulSoup(html, "html.parser")
-    except ImportError:
-        # Fallback to curl_cffi if playwright not installed
-        print(f"  ⚠️  Playwright not found, falling back to curl_cffi", file=sys.stderr)
-        try:
-            resp = cf_requests.get(url, impersonate="chrome120", timeout=20)
-            resp.raise_for_status()
-            return BeautifulSoup(resp.text, "html.parser")
-        except Exception as e:
-            print(f"  ⚠️  Fetch error for {slug}: {e}", file=sys.stderr)
-            return None
+        if "Career" in html:
+            return BeautifulSoup(html, "html.parser")
+        print(f"  ⚠️  Playwright: no Career data found for {slug}")
     except Exception as e:
-        print(f"  ⚠️  Fetch error for {slug}: {e}", file=sys.stderr)
-        return None
+        print(f"  ❌ Playwright fallback failed for {slug}: {e}", file=sys.stderr)
+
+    return None
 
 
 # ── Normalization ranges derived from WTA career stat distributions ───────────
@@ -869,7 +868,7 @@ def scrape_player(player: dict, debug: bool = False) -> Optional[dict]:
         "country":        country,
         "emoji":          emoji,
         "rank":           player["rank"],
-        "lastUpdated":    datetime.utcnow().strftime("%Y-%m-%d"),
+        "lastUpdated":    datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "ratings":        ratings,
         "elo":            elo,
         "recentMatches":  recent_matches,
@@ -896,101 +895,65 @@ def country_to_flag(code: str) -> str:
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="WTA Tennis Abstract Scraper")
-    parser.add_argument("slug", nargs="?", help="Single player slug for testing (e.g. IgaSwiatek)")
-    parser.add_argument("--top", type=int, default=int(os.environ.get("TOP_N", 100)),
-                        help="Number of top-ranked players to scrape (default: 100)")
+    parser.add_argument("slug", nargs="?", help="Single player slug (e.g. IgaSwiatek)")
+    parser.add_argument("--top", type=int, default=int(os.environ.get("TOP_N", 0)),
+                        help="Number of top-ranked players to scrape")
     args = parser.parse_args()
 
-    # Single-player test mode
+    out_path = os.environ.get("OUTPUT_PATH", "players.json")
+
+    # ── Determine who to scrape ───────────────────────────────────────────────
     if args.slug:
         player = next((p for p in FALLBACK_PLAYERS if p["slug"] == args.slug), None)
         if not player:
             player = {"rank": 0, "name": args.slug, "slug": args.slug, "country": ""}
         players_to_scrape = [player]
-    else:
+    elif args.top > 0:
         players_to_scrape = fetch_rankings(top_n=args.top)
+    else:
+        print("❌ No slug or --top provided.", file=sys.stderr)
+        sys.exit(1)
 
     results = []
-    errors = []
+    errors  = []
+    debug   = len(players_to_scrape) == 1
 
     print(f"🎾 Scraping {len(players_to_scrape)} WTA players from Tennis Abstract...")
-
-    debug = len(players_to_scrape) == 1
 
     for i, player in enumerate(players_to_scrape):
         try:
             result = scrape_player(player, debug=debug)
             if result:
                 results.append(result)
-                print(f"  ✅ {player['name']} — {result['ratings']}")
+                print(f"  ✅ {player['name']}")
             else:
                 errors.append(player["name"])
         except Exception as e:
-            print(f"  ❌ Error processing {player['name']}: {e}", file=sys.stderr)
+            print(f"  ❌ {player['name']}: {e}", file=sys.stderr)
             errors.append(player["name"])
 
-        # Polite delay between requests (1.5–3.5s randomized)
+        # Polite delay between requests
         if i < len(players_to_scrape) - 1:
-            delay = random.uniform(1.5, 3.5)
-            time.sleep(delay)
+            time.sleep(random.uniform(1.0, 2.5))
 
-    # Output
+    # ── Write output — framework wrapper handles GCS/storage ─────────────────
     output = {
-        "lastUpdated": datetime.utcnow().strftime("%Y-%m-%d"),
+        "lastUpdated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "playerCount": len(results),
-        "players": results,
-        "errors": errors,
+        "players":     results,
+        "errors":      errors,
     }
-
-    out_path = os.environ.get("OUTPUT_PATH", "players.json")
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
 
-    print(f"\n✅ Done. {len(results)} players scraped, {len(errors)} errors.")
-    print(f"📁 Output: {out_path}")
+    print(f"\n✅ Done. {len(results)} scraped, {len(errors)} errors → {out_path}")
     if errors:
         print(f"❌ Failed: {', '.join(errors)}")
 
-    # ── Upload to GCS (if bucket configured) ─────────────────────────────────
-    gcs_bucket = os.environ.get("GCS_BUCKET")
-    if gcs_bucket:
-        try:
-            from google.cloud import storage as gcs
-            client = gcs.Client()
-            bucket = client.bucket(gcs_bucket)
-            blob = bucket.blob("players.json")
-            blob.upload_from_filename(out_path, content_type="application/json")
-            # blob.make_public()  # disabled: bucket has public access prevention
-            print(f"☁️  Uploaded to gs://{gcs_bucket}/players.json")
-        except Exception as e:
-            print(f"⚠️  GCS upload failed: {e}", file=sys.stderr)
-
-    # ── Write to Firestore (if project configured) ────────────────────────────
-    firestore_project = os.environ.get("FIRESTORE_PROJECT")
-    if firestore_project:
-        try:
-            from google.cloud import firestore
-            db = firestore.Client(project=firestore_project)
-            batch = db.batch()
-            col = db.collection("wta_players")
-
-            # Write each player as a separate document keyed by slug
-            for player_data in results:
-                ref = col.document(player_data["slug"])
-                batch.set(ref, player_data)
-
-            # Write a metadata doc
-            meta_ref = db.collection("wta_meta").document("last_run")
-            batch.set(meta_ref, {
-                "lastUpdated": output["lastUpdated"],
-                "playerCount": output["playerCount"],
-                "errors": output["errors"],
-            })
-
-            batch.commit()
-            print(f"🔥 Firestore: {len(results)} player docs written to 'wta_players' collection")
-        except Exception as e:
-            print(f"⚠️  Firestore write failed: {e}", file=sys.stderr)
+    # ── Exit code discipline: signal failure to wrapper ───────────────────────
+    if args.slug and not results:
+        print(f"❌ No data returned for slug: {args.slug}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
