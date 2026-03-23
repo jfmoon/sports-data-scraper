@@ -23,7 +23,7 @@ import random
 import re
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 # ── Top 100 WTA players (from tennisabstract.com/reports/wtaRankings.html, March 2026) ──
