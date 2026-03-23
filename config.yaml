@@ -56,3 +56,32 @@ scrapers:
     gcs_object: tennis/players.json
     top: 100
     slug: null
+    priority_players:
+      - {name: "Jessica Pegula",       slug: "JessicaPegula"}
+      - {name: "Amanda Anisimova",     slug: "AmandaAnisimova"}
+      - {name: "Naomi Osaka",          slug: "NaomiOsaka"}
+      - {name: "Belinda Bencic",       slug: "BelindaBencic"}
+      - {name: "Linda Noskova",        slug: "LindaNoskova"}
+      - {name: "Qinwen Zheng",         slug: "QinwenZheng"}
+      - {name: "Clara Tauson",         slug: "ClaraTauson"}
+      - {name: "Eva Lys",              slug: "EvaLys"}
+      - {name: "Alexandra Eala",       slug: "AlexandraEala"}
+      - {name: "McCartney Kessler",    slug: "McCartneKessler"}
+      - {name: "Jaqueline Cristian",   slug: "JaquelineCristian"}
+      - {name: "Leylah Fernandez",     slug: "LeylahFernandez"}
+      - {name: "Emma Raducanu",        slug: "EmmaRaducanu"}
+      - {name: "Camila Osorio",        slug: "CamilaOsorio"}
+      - {name: "Olga Danilovic",       slug: "OlgaDanilovic"}
+      - {name: "Lilli Tagger",         slug: "LilliTagger"}
+      - {name: "Ajla Tomljanovic",     slug: "AjlaTomljanovic"}
+      - {name: "Cristina Bucsa",       slug: "CristinaBucsa"}
+      - {name: "Oksana Selekhmeteva",  slug: "OksanaSelekhmeteva"}
+      - {name: "Kamilla Rakhimova",    slug: "KamillaRakhimova"}
+      - {name: "Simona Waltert",       slug: "SimonaWaltert"}
+      - {name: "Brenda Fruhvirtova",   slug: "BrendaFruhvirtova"}
+      - {name: "Emiliana Arango",      slug: "EmilianaArango"}
+      - {name: "Barbora Palicova",     slug: "BarboraPalicova"}
+      - {name: "Dalayna Hewitt",       slug: "DalaynaHewitt"}
+      - {name: "Ekaterina Reyngold",   slug: "EkaterinaReyngold"}
+      - {name: "Yuliia Starodubtseva", slug: "YuliiaStarodubtseva"}
+      - {name: "Wakana Sonobe",        slug: "WakanaSonobe"}

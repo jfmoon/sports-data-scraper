@@ -7,11 +7,13 @@ and computes 1-10 attribute scores for the WTA Style Classifier.
 
 After the scrape completes it:
   1. Uploads raw JSON  → GCS: raw/tennisabstract/{date}/players_{ts}.json
-  2. Writes parsed     → GCS: tennis/players.json  (canonical player data)
+  2. Writes parsed     → GCS: tennis/players.json
 
 Config keys (in config.yaml under tennisabstract):
-  top: 100          # number of top-ranked players to scrape
-  slug: null        # single player slug for testing (e.g. IgaSwiatek)
+  top: 100                # number of top-ranked players to scrape
+  slug: null              # single player slug for testing (e.g. IgaSwiatek)
+  priority_players:       # always scraped regardless of ranking
+    - {name: "Emma Raducanu", slug: "EmmaRaducanu"}
 """
 
 import json
@@ -21,7 +23,6 @@ import sys
 from datetime import datetime, timezone
 
 from base.scraper import BaseScraper
-from base.models import TennisPlayer
 from base.storage import StorageManager
 
 
@@ -33,38 +34,91 @@ TENNISABSTRACT_SCRAPER = os.path.join(
 class TennisAbstractScraper(BaseScraper):
 
     def fetch(self):
-        top      = self.config.get("top", 100)
-        slug     = self.config.get("slug", None)
-        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        ts_str   = datetime.now(timezone.utc).strftime("%H%M%S")
-        out_dir  = f"data/raw/tennisabstract/{date_str}"
+        top              = self.config.get("top", 100)
+        slug             = self.config.get("slug", None)
+        priority_players = self.config.get("priority_players", [])
+        date_str         = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        ts_str           = datetime.now(timezone.utc).strftime("%H%M%S")
+        out_dir          = f"data/raw/tennisabstract/{date_str}"
         os.makedirs(out_dir, exist_ok=True)
 
-        out_path = f"{out_dir}/players_{ts_str}.json"
-
         env = os.environ.copy()
-        env["OUTPUT_PATH"]  = out_path
-        env["TOP_N"]        = str(top)
-        # Point scraper at our bucket so its internal GCS upload also works
-        env["GCS_BUCKET"]   = self.config.get("bucket", "")
+        env["GCS_BUCKET"] = self.config.get("bucket", "")
 
-        cmd = [sys.executable, TENNISABSTRACT_SCRAPER]
+        all_results = []
+        errors      = []
+
+        # ── Single-player test mode ───────────────────────────────────────────
         if slug:
-            cmd.append(slug)
+            out_path = f"{out_dir}/players_{ts_str}.json"
+            env["OUTPUT_PATH"] = out_path
+            env["TOP_N"]       = "0"
+            print(f"\n[TennisAbstract] Single player mode: {slug}")
+            subprocess.run([sys.executable, TENNISABSTRACT_SCRAPER, slug],
+                           check=True, env=env)
+            with open(out_path, "r") as f:
+                data = json.load(f)
+            self._raw_path = out_path
+            self._raw_mode = "players"
+            return {"mode": "players", "path": out_path, "data": data}
 
-        print(f"\n[TennisAbstract] Scraping top {top} WTA players → {out_path}")
-        subprocess.run(cmd, check=True, env=env)
+        # ── Normal mode: top N rankings ───────────────────────────────────────
+        ranked_path = f"{out_dir}/ranked_{ts_str}.json"
+        env["OUTPUT_PATH"] = ranked_path
+        env["TOP_N"]       = str(top)
+        print(f"\n[TennisAbstract] Scraping top {top} WTA players...")
+        subprocess.run([sys.executable, TENNISABSTRACT_SCRAPER],
+                       check=True, env=env)
 
-        with open(out_path, "r") as f:
-            data = json.load(f)
+        with open(ranked_path, "r") as f:
+            ranked_data = json.load(f)
 
-        self._raw_path = out_path
+        ranked_slugs = {p["slug"] for p in ranked_data.get("players", [])}
+        all_results  = ranked_data.get("players", [])
+        errors       = ranked_data.get("errors", [])
+
+        # ── Priority players not already in top N ─────────────────────────────
+        extras = [p for p in priority_players if p["slug"] not in ranked_slugs]
+        if extras:
+            print(f"\n[TennisAbstract] Scraping {len(extras)} priority players not in top {top}...")
+            for i, player in enumerate(extras):
+                extra_path = f"{out_dir}/priority_{player['slug']}_{ts_str}.json"
+                env["OUTPUT_PATH"] = extra_path
+                env["TOP_N"]       = "0"
+                try:
+                    subprocess.run(
+                        [sys.executable, TENNISABSTRACT_SCRAPER, player["slug"]],
+                        check=True, env=env
+                    )
+                    with open(extra_path, "r") as f:
+                        extra_data = json.load(f)
+                    players = extra_data.get("players", [])
+                    if players:
+                        all_results.extend(players)
+                        print(f"  ✅ {player['name']}")
+                    else:
+                        errors.append(player["name"])
+                except Exception as e:
+                    print(f"  ❌ Failed {player['name']}: {e}")
+                    errors.append(player["name"])
+
+        # ── Write merged output file ──────────────────────────────────────────
+        merged_path = f"{out_dir}/players_{ts_str}.json"
+        merged = {
+            "lastUpdated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "playerCount": len(all_results),
+            "players":     all_results,
+            "errors":      errors,
+        }
+        with open(merged_path, "w") as f:
+            json.dump(merged, f, indent=2)
+
+        self._raw_path = merged_path
         self._raw_mode = "players"
 
-        return {"mode": "players", "path": out_path, "data": data}
+        return {"mode": "players", "path": merged_path, "data": merged}
 
     def content_key(self, raw):
-        # Hash on lastUpdated + playerCount — full data is too large to hash every run
         d = raw.get("data", {})
         return {
             "lastUpdated": d.get("lastUpdated"),
@@ -75,8 +129,6 @@ class TennisAbstractScraper(BaseScraper):
         return raw["data"].get("players", [])
 
     def validate(self, records):
-        # Player records are rich dicts — pass through without stripping to Pydantic
-        # TennisPlayer model is a subset; full records include ratings, elo, matches
         return records
 
     def upsert(self, records):
@@ -95,6 +147,5 @@ class TennisAbstractScraper(BaseScraper):
             "player_count": len(records),
             "players":      records,
         }
-
         url = storage.write_json(self.config["gcs_object"], payload)
         print(f"  [TennisAbstract] Parsed output → {url}")
