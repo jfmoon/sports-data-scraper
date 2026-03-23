@@ -5,7 +5,7 @@ Delegates all browser automation to kenpom_scraper.py (Playwright + stealth).
 After the scrape completes it:
   1. Uploads raw CSV   → GCS: raw/kenpom/{date}/kenpom_{ts}.csv
   2. Uploads raw JSON  → GCS: raw/kenpom/{date}/fanmatch_{ts}.json  (fanmatch mode)
-  3. Writes parsed     → GCS: cbb/kenpom.json  (public)
+  3. Writes parsed     → GCS: cbb/kenpom.json
   4. Saves local copy  → data/raw/kenpom/{date}/
 
 Config keys (in config.yaml under kenpom):
@@ -27,18 +27,19 @@ from base.models import CBBTeam
 from base.storage import StorageManager
 
 
-KENPOM_SCRAPER = os.path.join(os.path.dirname(__file__), "..", "..", "kenpom_scraper.py")
+# kenpom_scraper.py lives alongside this file in scrapers/cbb/
+KENPOM_SCRAPER = os.path.join(os.path.dirname(__file__), "kenpom_scraper.py")
 
 
 class KenPomScraper(BaseScraper):
 
     def fetch(self):
-        top          = self.config.get("top", 68)
-        fanmatch     = self.config.get("fanmatch", False)
-        fanmatch_dt  = self.config.get("fanmatch_date", None)
-        date_str     = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        ts_str       = datetime.now(timezone.utc).strftime("%H%M%S")
-        out_dir      = f"data/raw/kenpom/{date_str}"
+        top         = self.config.get("top", 68)
+        fanmatch    = self.config.get("fanmatch", False)
+        fanmatch_dt = self.config.get("fanmatch_date", None)
+        date_str    = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        ts_str      = datetime.now(timezone.utc).strftime("%H%M%S")
+        out_dir     = f"data/raw/kenpom/{date_str}"
         os.makedirs(out_dir, exist_ok=True)
 
         if fanmatch:
@@ -64,11 +65,13 @@ class KenPomScraper(BaseScraper):
             with open(out_path, "r") as f:
                 data = f.read()
 
-        return {"mode": "fanmatch" if fanmatch else "ratings",
-                "path": out_path, "data": data}
+        # Stash for upsert()
+        self._raw_path = out_path
+        self._raw_mode = "fanmatch" if fanmatch else "ratings"
+
+        return {"mode": self._raw_mode, "path": out_path, "data": data}
 
     def content_key(self, raw):
-        # Hash the raw data string/dict so unchanged content is skipped
         return raw.get("data", "")
 
     def parse(self, raw):
@@ -119,7 +122,6 @@ class KenPomScraper(BaseScraper):
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         ts_str   = datetime.now(timezone.utc).strftime("%H%M%S")
 
-        # Re-read path from config data stashed during run
         raw_path = getattr(self, "_raw_path", None)
         raw_mode = getattr(self, "_raw_mode", "ratings")
 
@@ -129,12 +131,11 @@ class KenPomScraper(BaseScraper):
             storage.write_raw_file(gcs_raw, raw_path)
             print(f"  [KenPom] Raw file → gs://{self.config['bucket']}/{gcs_raw}")
 
-        # Write parsed output
         if records and isinstance(records[0], CBBTeam):
             payload = {
                 "updated":    datetime.now(timezone.utc).isoformat(),
                 "team_count": len(records),
-                "teams":      [r.model_dump() for r in records]
+                "teams":      [r.model_dump(mode="json") for r in records]
             }
         else:
             payload = {
