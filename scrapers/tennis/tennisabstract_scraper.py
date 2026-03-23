@@ -36,8 +36,8 @@ def fetch_rankings(top_n: int = 100) -> list:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
-            page.goto(url, wait_until="domcontentloaded", timeout=30000)
-            page.wait_for_selector("table", timeout=20000)
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            page.wait_for_selector("table", timeout=60000)
             players = page.evaluate("""(topN) => {
                 const tables = Array.from(document.querySelectorAll('table'));
                 let rankTable = null;
@@ -346,13 +346,16 @@ def fetch_player_page(slug: str) -> Optional[BeautifulSoup]:
     # ── Primary: curl_cffi (Chrome impersonation, no browser overhead) ────────
     try:
         resp = cf_requests.get(url, impersonate="chrome120", timeout=15)
-        if resp.status_code == 200 and "Career" in resp.text:
-            return BeautifulSoup(resp.text, "html.parser")
-        print(f"  ⚠️  curl_cffi: unexpected response for {slug} (status {resp.status_code})")
+        if resp.status_code == 200:
+            soup = BeautifulSoup(resp.text, "html.parser")
+            # Verify we got a real player page — check for at least one data table
+            if soup.find("table"):
+                return soup
+        print(f"  ⚠️  curl_cffi: no table data for {slug} (status {resp.status_code}), trying Playwright")
     except Exception as e:
         print(f"  ⚠️  curl_cffi failed for {slug}: {e}", file=sys.stderr)
 
-    # ── Fallback: Playwright (only if curl_cffi is blocked or fails) ──────────
+    # ── Fallback: Playwright (only if curl_cffi gets no tables) ──────────────
     try:
         from playwright.sync_api import sync_playwright
         with sync_playwright() as p:
@@ -361,9 +364,10 @@ def fetch_player_page(slug: str) -> Optional[BeautifulSoup]:
             page.goto(url, wait_until="networkidle", timeout=30000)
             html = page.content()
             browser.close()
-        if "Career" in html:
-            return BeautifulSoup(html, "html.parser")
-        print(f"  ⚠️  Playwright: no Career data found for {slug}")
+        soup = BeautifulSoup(html, "html.parser")
+        if soup.find("table"):
+            return soup
+        print(f"  ⚠️  Playwright: still no table data for {slug}")
     except Exception as e:
         print(f"  ❌ Playwright fallback failed for {slug}: {e}", file=sys.stderr)
 

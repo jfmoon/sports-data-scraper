@@ -36,7 +36,7 @@ scrapers:
 
   sofascore:
     name: sofascore
-    enabled: true
+    enabled: false
     sport: tennis
     bucket: sports-data-scraper-491116
     gcs_object: tennis/matches.json

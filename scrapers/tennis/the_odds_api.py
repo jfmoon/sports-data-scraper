@@ -5,6 +5,7 @@ from base.scraper import BaseScraper
 from base.models import TennisOdds
 from base.storage import StorageManager
 
+
 class TheOddsApiScraper(BaseScraper):
     def fetch(self):
         api_key = os.environ.get("THE_ODDS_API_KEY")
@@ -28,14 +29,14 @@ class TheOddsApiScraper(BaseScraper):
             if not h2h: continue
 
             odds_out.append({
-                "match_id": event["id"],
-                "tournament": event["sport_title"],
-                "p1_name": self.resolver.resolve(event["home_team"]),
-                "p2_name": self.resolver.resolve(event["away_team"]),
-                "p1_ml": next((o["price"] for o in h2h["outcomes"] if o["name"] == event["home_team"]), None),
-                "p2_ml": next((o["price"] for o in h2h["outcomes"] if o["name"] == event["away_team"]), None),
-                "bookmaker": "DraftKings",
-                "commence_time": event["commence_time"]
+                "match_id":      event["id"],
+                "tournament":    event["sport_title"],
+                "p1_name":       self.resolver.resolve(event["home_team"]),
+                "p2_name":       self.resolver.resolve(event["away_team"]),
+                "p1_ml":         next((o["price"] for o in h2h["outcomes"] if o["name"] == event["home_team"]), None),
+                "p2_ml":         next((o["price"] for o in h2h["outcomes"] if o["name"] == event["away_team"]), None),
+                "bookmaker":     "DraftKings",
+                "commence_time": event["commence_time"],
             })
         return odds_out
 
@@ -46,6 +47,6 @@ class TheOddsApiScraper(BaseScraper):
         storage = StorageManager(self.config["bucket"])
         payload = {
             "updated": datetime.now(timezone.utc).isoformat(),
-            "odds": [r.model_dump() for r in records]
+            "odds":    [r.model_dump(mode="json") for r in records]
         }
         storage.write_json(self.config["gcs_object"], payload)
