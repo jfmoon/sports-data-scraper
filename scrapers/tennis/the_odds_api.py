@@ -8,7 +8,9 @@ from base.storage import StorageManager
 class TheOddsApiScraper(BaseScraper):
     def fetch(self):
         api_key = os.environ.get("THE_ODDS_API_KEY")
-        url = f"https://api.the-odds-api.com/v4/sports/tennis_wta/odds/?apiKey={api_key}&regions=us&markets=h2h"
+        if not api_key:
+            raise ValueError("THE_ODDS_API_KEY not set")
+        url = f"https://api.the-odds-api.com/v4/sports/tennis/odds/?apiKey={api_key}&regions=us&markets=h2h"
         res = requests.get(url, timeout=15)
         res.raise_for_status()
         return res.json()
@@ -19,10 +21,9 @@ class TheOddsApiScraper(BaseScraper):
     def parse(self, raw):
         odds_out = []
         for event in raw:
-            # Extract ML for bookmaker specified in config
             book = next((b for b in event.get("bookmakers", []) if b["key"] == "draftkings"), None)
             if not book: continue
-            
+
             h2h = next((m for m in book["markets"] if m["key"] == "h2h"), None)
             if not h2h: continue
 

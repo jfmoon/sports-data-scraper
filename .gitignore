@@ -1,18 +1,10 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Environments
 venv/
-env/
-.env
-
-# Local Data (Audit artifacts)
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
 data/raw/
-*.csv
-kenpom_local.html
-
-# GCP / Secrets
-*.json
-!config.yaml
+kenpom_data.csv
+fanmatch_data.json
+debug_page.html
+*.egg-info/

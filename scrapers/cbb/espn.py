@@ -4,6 +4,7 @@ from base.scraper import BaseScraper
 from base.models import CBBGame
 from base.storage import StorageManager
 
+
 class ESPNScraper(BaseScraper):
     def fetch(self):
         url = "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard"
@@ -12,32 +13,30 @@ class ESPNScraper(BaseScraper):
         return res.json()
 
     def content_key(self, raw):
-        """Hash only the events list to ignore API envelope timestamps."""
         return raw.get("events", [])
 
     def parse(self, raw):
         results = []
         for ev in raw.get("events", []):
             try:
-                comp = ev["competitions"][0]
+                comp   = ev["competitions"][0]
                 t1, t2 = comp["competitors"][0], comp["competitors"][1]
-                
-                # Coercion: Pydantic Optional[int] rejects ""
+
                 def clean_score(s):
                     if s is None or s == "": return None
                     try: return int(s)
                     except: return None
 
                 results.append({
-                    "espn_id": ev["id"],
-                    "date": ev["date"][:10],
-                    "state": ev["status"]["type"]["state"],
+                    "espn_id":   ev["id"],
+                    "date":      ev["date"][:10],
+                    "state":     ev["status"]["type"]["state"],
                     "completed": ev["status"]["type"]["completed"],
-                    "t1_name": self.resolver.resolve(t1["team"]["displayName"]),
-                    "t1_score": clean_score(t1.get("score")),
+                    "t1_name":   self.resolver.resolve(t1["team"]["displayName"]),
+                    "t1_score":  clean_score(t1.get("score")),
                     "t1_winner": t1.get("winner", False),
-                    "t2_name": self.resolver.resolve(t2["team"]["displayName"]),
-                    "t2_score": clean_score(t2.get("score")),
+                    "t2_name":   self.resolver.resolve(t2["team"]["displayName"]),
+                    "t2_score":  clean_score(t2.get("score")),
                     "t2_winner": t2.get("winner", False),
                 })
             except Exception as e:
@@ -50,8 +49,8 @@ class ESPNScraper(BaseScraper):
     def upsert(self, records):
         storage = StorageManager(self.config["bucket"])
         payload = {
-            "updated": datetime.now(timezone.utc).isoformat(),
+            "updated":    datetime.now(timezone.utc).isoformat(),
             "game_count": len(records),
-            "games": [r.model_dump() for r in records]
+            "games":      [r.model_dump(mode="json") for r in records]
         }
         storage.write_json(self.config["gcs_object"], payload)

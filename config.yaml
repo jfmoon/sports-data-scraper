@@ -1,5 +1,5 @@
 groups:
-  cbb: [espn, action_network]
+  cbb: [espn, action_network, kenpom, evanmiya]
   tennis: [sofascore, the_odds_api]
 
 scrapers:
@@ -7,26 +7,41 @@ scrapers:
     name: espn
     enabled: true
     sport: cbb
-    bucket: cbb-scores-490420
-    gcs_object: scores.json
+    bucket: sports-data-scraper-491116
+    gcs_object: cbb/scores.json
 
   action_network:
     name: action_network
     enabled: true
     sport: cbb
-    bucket: cbb-scores-490420
-    gcs_object: odds.json
+    bucket: sports-data-scraper-491116
+    gcs_object: cbb/odds.json
+
+  kenpom:
+    name: kenpom
+    enabled: true
+    sport: cbb
+    bucket: sports-data-scraper-491116
+    gcs_object: cbb/kenpom.json
+    top: 68
+
+  evanmiya:
+    name: evanmiya
+    enabled: false
+    sport: cbb
+    bucket: sports-data-scraper-491116
+    gcs_object: cbb/evanmiya.json
 
   sofascore:
     name: sofascore
     enabled: true
     sport: tennis
-    bucket: tennisabstract-scraper-sports-data
-    gcs_object: matches.json
+    bucket: sports-data-scraper-491116
+    gcs_object: tennis/matches.json
 
   the_odds_api:
     name: the_odds_api
     enabled: true
     sport: tennis
-    bucket: tennisabstract-scraper-sports-data
-    gcs_object: tennis_odds.json
+    bucket: sports-data-scraper-491116
+    gcs_object: tennis/odds.json
