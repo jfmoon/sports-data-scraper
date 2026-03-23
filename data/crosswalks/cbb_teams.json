@@ -1,0 +1,1012 @@
+{
+  "canonical": [
+    {
+      "name": "UConn",
+      "aliases": ["Connecticut Huskies", "Connecticut", "UConn Huskies"],
+      "sources": {
+        "espn": "Connecticut Huskies",
+        "action_network": "UConn",
+        "kenpom": "Connecticut"
+      }
+    },
+    {
+      "name": "Purdue",
+      "aliases": ["Purdue Boilermakers", "Purdue"],
+      "sources": {
+        "espn": "Purdue Boilermakers",
+        "action_network": "Purdue",
+        "kenpom": "Purdue"
+      }
+    },
+    {
+      "name": "Houston",
+      "aliases": ["Houston Cougars", "Houston"],
+      "sources": {
+        "espn": "Houston Cougars",
+        "action_network": "Houston",
+        "kenpom": "Houston"
+      }
+    },
+    {
+      "name": "North Carolina",
+      "aliases": ["North Carolina Tar Heels", "UNC", "N. Carolina"],
+      "sources": {
+        "espn": "North Carolina Tar Heels",
+        "action_network": "North Carolina",
+        "kenpom": "North Carolina"
+      }
+    },
+    {
+      "name": "Tennessee",
+      "aliases": ["Tennessee Volunteers", "Tennessee Vols"],
+      "sources": {
+        "espn": "Tennessee Volunteers",
+        "action_network": "Tennessee",
+        "kenpom": "Tennessee"
+      }
+    },
+    {
+      "name": "Arizona",
+      "aliases": ["Arizona Wildcats", "Arizona"],
+      "sources": {
+        "espn": "Arizona Wildcats",
+        "action_network": "Arizona",
+        "kenpom": "Arizona"
+      }
+    },
+    {
+      "name": "Marquette",
+      "aliases": ["Marquette Golden Eagles", "Marquette"],
+      "sources": {
+        "espn": "Marquette Golden Eagles",
+        "action_network": "Marquette",
+        "kenpom": "Marquette"
+      }
+    },
+    {
+      "name": "Iowa State",
+      "aliases": ["Iowa State Cyclones", "Iowa St."],
+      "sources": {
+        "espn": "Iowa State Cyclones",
+        "action_network": "Iowa State",
+        "kenpom": "Iowa St."
+      }
+    },
+    {
+      "name": "Alabama",
+      "aliases": ["Alabama Crimson Tide", "Alabama"],
+      "sources": {
+        "espn": "Alabama Crimson Tide",
+        "action_network": "Alabama",
+        "kenpom": "Alabama"
+      }
+    },
+    {
+      "name": "Baylor",
+      "aliases": ["Baylor Bears", "Baylor"],
+      "sources": {
+        "espn": "Baylor Bears",
+        "action_network": "Baylor",
+        "kenpom": "Baylor"
+      }
+    },
+    {
+      "name": "Illinois",
+      "aliases": ["Illinois Fighting Illini", "Illinois"],
+      "sources": {
+        "espn": "Illinois Fighting Illini",
+        "action_network": "Illinois",
+        "kenpom": "Illinois"
+      }
+    },
+    {
+      "name": "Creighton",
+      "aliases": ["Creighton Bluejays", "Creighton"],
+      "sources": {
+        "espn": "Creighton Bluejays",
+        "action_network": "Creighton",
+        "kenpom": "Creighton"
+      }
+    },
+    {
+      "name": "Duke",
+      "aliases": ["Duke Blue Devils", "Duke"],
+      "sources": {
+        "espn": "Duke Blue Devils",
+        "action_network": "Duke",
+        "kenpom": "Duke"
+      }
+    },
+    {
+      "name": "Kansas",
+      "aliases": ["Kansas Jayhawks", "Kansas"],
+      "sources": {
+        "espn": "Kansas Jayhawks",
+        "action_network": "Kansas",
+        "kenpom": "Kansas"
+      }
+    },
+    {
+      "name": "Kentucky",
+      "aliases": ["Kentucky Wildcats", "Kentucky"],
+      "sources": {
+        "espn": "Kentucky Wildcats",
+        "action_network": "Kentucky",
+        "kenpom": "Kentucky"
+      }
+    },
+    {
+      "name": "Auburn",
+      "aliases": ["Auburn Tigers", "Auburn"],
+      "sources": {
+        "espn": "Auburn Tigers",
+        "action_network": "Auburn",
+        "kenpom": "Auburn"
+      }
+    },
+    {
+      "name": "San Diego State",
+      "aliases": ["San Diego State Aztecs", "San Diego St.", "SDSU"],
+      "sources": {
+        "espn": "San Diego State Aztecs",
+        "action_network": "San Diego State",
+        "kenpom": "San Diego St."
+      }
+    },
+    {
+      "name": "Gonzaga",
+      "aliases": ["Gonzaga Bulldogs", "Gonzaga"],
+      "sources": {
+        "espn": "Gonzaga Bulldogs",
+        "action_network": "Gonzaga",
+        "kenpom": "Gonzaga"
+      }
+    },
+    {
+      "name": "Saint Mary's",
+      "aliases": ["Saint Mary's Gaels", "Saint Mary's (CA)", "St. Mary's"],
+      "sources": {
+        "espn": "Saint Mary's Gaels",
+        "action_network": "Saint Mary's (CA)",
+        "kenpom": "Saint Mary's"
+      }
+    },
+    {
+      "name": "Clemson",
+      "aliases": ["Clemson Tigers", "Clemson"],
+      "sources": {
+        "espn": "Clemson Tigers",
+        "action_network": "Clemson",
+        "kenpom": "Clemson"
+      }
+    },
+    {
+      "name": "South Carolina",
+      "aliases": ["South Carolina Gamecocks", "S. Carolina"],
+      "sources": {
+        "espn": "South Carolina Gamecocks",
+        "action_network": "South Carolina",
+        "kenpom": "South Carolina"
+      }
+    },
+    {
+      "name": "BYU",
+      "aliases": ["BYU Cougars", "Brigham Young"],
+      "sources": {
+        "espn": "BYU Cougars",
+        "action_network": "BYU",
+        "kenpom": "BYU"
+      }
+    },
+    {
+      "name": "Texas Tech",
+      "aliases": ["Texas Tech Red Raiders", "Texas Tech"],
+      "sources": {
+        "espn": "Texas Tech Red Raiders",
+        "action_network": "Texas Tech",
+        "kenpom": "Texas Tech"
+      }
+    },
+    {
+      "name": "Florida",
+      "aliases": ["Florida Gators", "Florida"],
+      "sources": {
+        "espn": "Florida Gators",
+        "action_network": "Florida",
+        "kenpom": "Florida"
+      }
+    },
+    {
+      "name": "Utah State",
+      "aliases": ["Utah State Aggies", "Utah St."],
+      "sources": {
+        "espn": "Utah State Aggies",
+        "action_network": "Utah State",
+        "kenpom": "Utah St."
+      }
+    },
+    {
+      "name": "Texas",
+      "aliases": ["Texas Longhorns", "Texas"],
+      "sources": {
+        "espn": "Texas Longhorns",
+        "action_network": "Texas",
+        "kenpom": "Texas"
+      }
+    },
+    {
+      "name": "Nebraska",
+      "aliases": ["Nebraska Cornhuskers", "Nebraska"],
+      "sources": {
+        "espn": "Nebraska Cornhuskers",
+        "action_network": "Nebraska",
+        "kenpom": "Nebraska"
+      }
+    },
+    {
+      "name": "Washington State",
+      "aliases": ["Washington State Cougars", "Washington St."],
+      "sources": {
+        "espn": "Washington State Cougars",
+        "action_network": "Washington State",
+        "kenpom": "Washington St."
+      }
+    },
+    {
+      "name": "Florida Atlantic",
+      "aliases": ["Florida Atlantic Owls", "FAU"],
+      "sources": {
+        "espn": "Florida Atlantic Owls",
+        "action_network": "Florida Atlantic",
+        "kenpom": "Florida Atlantic"
+      }
+    },
+    {
+      "name": "Mississippi State",
+      "aliases": ["Mississippi State Bulldogs", "Mississippi St."],
+      "sources": {
+        "espn": "Mississippi State Bulldogs",
+        "action_network": "Mississippi State",
+        "kenpom": "Mississippi St."
+      }
+    },
+    {
+      "name": "Northwestern",
+      "aliases": ["Northwestern Wildcats", "Northwestern"],
+      "sources": {
+        "espn": "Northwestern Wildcats",
+        "action_network": "Northwestern",
+        "kenpom": "Northwestern"
+      }
+    },
+    {
+      "name": "Texas A&M",
+      "aliases": ["Texas A&M Aggies", "Texas A&M"],
+      "sources": {
+        "espn": "Texas A&M Aggies",
+        "action_network": "Texas A&M",
+        "kenpom": "Texas A&M"
+      }
+    },
+    {
+      "name": "TCU",
+      "aliases": ["TCU Horned Frogs", "Texas Christian"],
+      "sources": {
+        "espn": "TCU Horned Frogs",
+        "action_network": "TCU",
+        "kenpom": "TCU"
+      }
+    },
+    {
+      "name": "Michigan State",
+      "aliases": ["Michigan State Spartans", "Michigan St."],
+      "sources": {
+        "espn": "Michigan State Spartans",
+        "action_network": "Michigan State",
+        "kenpom": "Michigan St."
+      }
+    },
+    {
+      "name": "Colorado",
+      "aliases": ["Colorado Buffaloes", "Colorado"],
+      "sources": {
+        "espn": "Colorado Buffaloes",
+        "action_network": "Colorado",
+        "kenpom": "Colorado"
+      }
+    },
+    {
+      "name": "Boise State",
+      "aliases": ["Boise State Broncos", "Boise St."],
+      "sources": {
+        "espn": "Boise State Broncos",
+        "action_network": "Boise State",
+        "kenpom": "Boise St."
+      }
+    },
+    {
+      "name": "Nevada",
+      "aliases": ["Nevada Wolf Pack", "Nevada"],
+      "sources": {
+        "espn": "Nevada Wolf Pack",
+        "action_network": "Nevada",
+        "kenpom": "Nevada"
+      }
+    },
+    {
+      "name": "Virginia",
+      "aliases": ["Virginia Cavaliers", "Virginia"],
+      "sources": {
+        "espn": "Virginia Cavaliers",
+        "action_network": "Virginia",
+        "kenpom": "Virginia"
+      }
+    },
+    {
+      "name": "Colorado State",
+      "aliases": ["Colorado State Rams", "Colorado St."],
+      "sources": {
+        "espn": "Colorado State Rams",
+        "action_network": "Colorado State",
+        "kenpom": "Colorado St."
+      }
+    },
+    {
+      "name": "New Mexico",
+      "aliases": ["New Mexico Lobos", "New Mexico"],
+      "sources": {
+        "espn": "New Mexico Lobos",
+        "action_network": "New Mexico",
+        "kenpom": "New Mexico"
+      }
+    },
+    {
+      "name": "NC State",
+      "aliases": ["NC State Wolfpack", "North Carolina State", "N.C. State"],
+      "sources": {
+        "espn": "NC State Wolfpack",
+        "action_network": "North Carolina State",
+        "kenpom": "N.C. State"
+      }
+    },
+    {
+      "name": "Samford",
+      "aliases": ["Samford Bulldogs", "Samford"],
+      "sources": {
+        "espn": "Samford Bulldogs",
+        "action_network": "Samford",
+        "kenpom": "Samford"
+      }
+    },
+    {
+      "name": "McNeese",
+      "aliases": ["McNeese Cowboys", "McNeese State", "McNeese St."],
+      "sources": {
+        "espn": "McNeese Cowboys",
+        "action_network": "McNeese State",
+        "kenpom": "McNeese St."
+      }
+    },
+    {
+      "name": "Grand Canyon",
+      "aliases": ["Grand Canyon Antelopes", "GCU"],
+      "sources": {
+        "espn": "Grand Canyon Antelopes",
+        "action_network": "Grand Canyon",
+        "kenpom": "Grand Canyon"
+      }
+    },
+    {
+      "name": "Drake",
+      "aliases": ["Drake Bulldogs", "Drake"],
+      "sources": {
+        "espn": "Drake Bulldogs",
+        "action_network": "Drake",
+        "kenpom": "Drake"
+      }
+    },
+    {
+      "name": "James Madison",
+      "aliases": ["James Madison Dukes", "JMU"],
+      "sources": {
+        "espn": "James Madison Dukes",
+        "action_network": "James Madison",
+        "kenpom": "James Madison"
+      }
+    },
+    {
+      "name": "Vermont",
+      "aliases": ["Vermont Catamounts", "Vermont"],
+      "sources": {
+        "espn": "Vermont Catamounts",
+        "action_network": "Vermont",
+        "kenpom": "Vermont"
+      }
+    },
+    {
+      "name": "Charleston",
+      "aliases": ["Charleston Cougars", "College of Charleston", "Col. of Charleston"],
+      "sources": {
+        "espn": "Charleston Cougars",
+        "action_network": "Charleston",
+        "kenpom": "College of Charleston"
+      }
+    },
+    {
+      "name": "Oakland",
+      "aliases": ["Oakland Golden Grizzlies", "Oakland"],
+      "sources": {
+        "espn": "Oakland Golden Grizzlies",
+        "action_network": "Oakland",
+        "kenpom": "Oakland"
+      }
+    },
+    {
+      "name": "Colgate",
+      "aliases": ["Colgate Raiders", "Colgate"],
+      "sources": {
+        "espn": "Colgate Raiders",
+        "action_network": "Colgate",
+        "kenpom": "Colgate"
+      }
+    },
+    {
+      "name": "Miami (FL)",
+      "aliases": ["Miami Hurricanes", "Miami FL", "Miami (FL) Hurricanes"],
+      "sources": {
+        "espn": "Miami Hurricanes",
+        "action_network": "Miami (FL)",
+        "kenpom": "Miami FL"
+      }
+    },
+    {
+      "name": "Miami (Ohio)",
+      "aliases": ["Miami (OH) RedHawks", "Miami OH", "Miami Ohio", "Miami RedHawks"],
+      "sources": {
+        "espn": "Miami (OH) RedHawks",
+        "action_network": "Miami (OH)",
+        "kenpom": "Miami OH"
+      }
+    },
+    {
+      "name": "St. John's",
+      "aliases": ["St. John's Red Storm", "Saint John's"],
+      "sources": {
+        "espn": "St. John's Red Storm",
+        "action_network": "St. John's",
+        "kenpom": "St. John's"
+      }
+    },
+    {
+      "name": "UCLA",
+      "aliases": ["UCLA Bruins", "UCLA"],
+      "sources": {
+        "espn": "UCLA Bruins",
+        "action_network": "UCLA",
+        "kenpom": "UCLA"
+      }
+    },
+    {
+      "name": "Arkansas",
+      "aliases": ["Arkansas Razorbacks", "Arkansas"],
+      "sources": {
+        "espn": "Arkansas Razorbacks",
+        "action_network": "Arkansas",
+        "kenpom": "Arkansas"
+      }
+    },
+    {
+      "name": "Kansas State",
+      "aliases": ["Kansas State Wildcats", "Kansas St."],
+      "sources": {
+        "espn": "Kansas State Wildcats",
+        "action_network": "Kansas State",
+        "kenpom": "Kansas St."
+      }
+    },
+    {
+      "name": "Xavier",
+      "aliases": ["Xavier Musketeers", "Xavier"],
+      "sources": {
+        "espn": "Xavier Musketeers",
+        "action_network": "Xavier",
+        "kenpom": "Xavier"
+      }
+    },
+    {
+      "name": "Oral Roberts",
+      "aliases": ["Oral Roberts Golden Eagles", "ORU"],
+      "sources": {
+        "espn": "Oral Roberts Golden Eagles",
+        "action_network": "Oral Roberts",
+        "kenpom": "Oral Roberts"
+      }
+    },
+    {
+      "name": "Princeton",
+      "aliases": ["Princeton Tigers", "Princeton"],
+      "sources": {
+        "espn": "Princeton Tigers",
+        "action_network": "Princeton",
+        "kenpom": "Princeton"
+      }
+    },
+    {
+      "name": "Furman",
+      "aliases": ["Furman Paladins", "Furman"],
+      "sources": {
+        "espn": "Furman Paladins",
+        "action_network": "Furman",
+        "kenpom": "Furman"
+      }
+    },
+    {
+      "name": "Fairleigh Dickinson",
+      "aliases": ["Fairleigh Dickinson Knights", "FDU"],
+      "sources": {
+        "espn": "Fairleigh Dickinson Knights",
+        "action_network": "Fairleigh Dickinson",
+        "kenpom": "Fairleigh Dickinson"
+      }
+    },
+    {
+      "name": "Saint Peter's",
+      "aliases": ["Saint Peter's Peacocks", "St. Peter's"],
+      "sources": {
+        "espn": "Saint Peter's Peacocks",
+        "action_network": "Saint Peter's",
+        "kenpom": "Saint Peter's"
+      }
+    },
+    {
+      "name": "Loyola Chicago",
+      "aliases": ["Loyola Chicago Ramblers", "Loyola (IL)"],
+      "sources": {
+        "espn": "Loyola Chicago Ramblers",
+        "action_network": "Loyola Chicago",
+        "kenpom": "Loyola Chicago"
+      }
+    },
+    {
+      "name": "Villanova",
+      "aliases": ["Villanova Wildcats", "Villanova"],
+      "sources": {
+        "espn": "Villanova Wildcats",
+        "action_network": "Villanova",
+        "kenpom": "Villanova"
+      }
+    },
+    {
+      "name": "Michigan",
+      "aliases": ["Michigan Wolverines", "Michigan"],
+      "sources": {
+        "espn": "Michigan Wolverines",
+        "action_network": "Michigan",
+        "kenpom": "Michigan"
+      }
+    },
+    {
+      "name": "USC",
+      "aliases": ["USC Trojans", "Southern California"],
+      "sources": {
+        "espn": "USC Trojans",
+        "action_network": "USC",
+        "kenpom": "USC"
+      }
+    },
+    {
+      "name": "Oregon",
+      "aliases": ["Oregon Ducks", "Oregon"],
+      "sources": {
+        "espn": "Oregon Ducks",
+        "action_network": "Oregon",
+        "kenpom": "Oregon"
+      }
+    },
+    {
+      "name": "Ohio State",
+      "aliases": ["Ohio State Buckeyes", "Ohio St."],
+      "sources": {
+        "espn": "Ohio State Buckeyes",
+        "action_network": "Ohio State",
+        "kenpom": "Ohio St."
+      }
+    },
+    {
+      "name": "Providence",
+      "aliases": ["Providence Friars", "Providence"],
+      "sources": {
+        "espn": "Providence Friars",
+        "action_network": "Providence",
+        "kenpom": "Providence"
+      }
+    },
+    {
+      "name": "Memphis",
+      "aliases": ["Memphis Tigers", "Memphis"],
+      "sources": {
+        "espn": "Memphis Tigers",
+        "action_network": "Memphis",
+        "kenpom": "Memphis"
+      }
+    },
+    {
+      "name": "Saint Louis",
+      "aliases": ["Saint Louis Billikens", "St. Louis"],
+      "sources": {
+        "espn": "Saint Louis Billikens",
+        "action_network": "Saint Louis",
+        "kenpom": "Saint Louis"
+      }
+    },
+    {
+      "name": "Iona",
+      "aliases": ["Iona Gaels", "Iona"],
+      "sources": {
+        "espn": "Iona Gaels",
+        "action_network": "Iona",
+        "kenpom": "Iona"
+      }
+    },
+    {
+      "name": "Murray State",
+      "aliases": ["Murray State Racers", "Murray St."],
+      "sources": {
+        "espn": "Murray State Racers",
+        "action_network": "Murray State",
+        "kenpom": "Murray St."
+      }
+    },
+    {
+      "name": "San Francisco",
+      "aliases": ["San Francisco Dons", "USF Dons"],
+      "sources": {
+        "espn": "San Francisco Dons",
+        "action_network": "San Francisco",
+        "kenpom": "San Francisco"
+      }
+    },
+    {
+      "name": "Wyoming",
+      "aliases": ["Wyoming Cowboys", "Wyoming"],
+      "sources": {
+        "espn": "Wyoming Cowboys",
+        "action_network": "Wyoming",
+        "kenpom": "Wyoming"
+      }
+    },
+    {
+      "name": "Richmond",
+      "aliases": ["Richmond Spiders", "Richmond"],
+      "sources": {
+        "espn": "Richmond Spiders",
+        "action_network": "Richmond",
+        "kenpom": "Richmond"
+      }
+    },
+    {
+      "name": "Davidson",
+      "aliases": ["Davidson Wildcats", "Davidson"],
+      "sources": {
+        "espn": "Davidson Wildcats",
+        "action_network": "Davidson",
+        "kenpom": "Davidson"
+      }
+    },
+    {
+      "name": "VCU",
+      "aliases": ["VCU Rams", "Virginia Commonwealth"],
+      "sources": {
+        "espn": "VCU Rams",
+        "action_network": "VCU",
+        "kenpom": "VCU"
+      }
+    },
+    {
+      "name": "St. Bonaventure",
+      "aliases": ["St. Bonaventure Bonnies", "Saint Bonaventure"],
+      "sources": {
+        "espn": "St. Bonaventure Bonnies",
+        "action_network": "St. Bonaventure",
+        "kenpom": "St. Bonaventure"
+      }
+    },
+    {
+      "name": "Rutgers",
+      "aliases": ["Rutgers Scarlet Knights", "Rutgers"],
+      "sources": {
+        "espn": "Rutgers Scarlet Knights",
+        "action_network": "Rutgers",
+        "kenpom": "Rutgers"
+      }
+    },
+    {
+      "name": "Seton Hall",
+      "aliases": ["Seton Hall Pirates", "Seton Hall"],
+      "sources": {
+        "espn": "Seton Hall Pirates",
+        "action_network": "Seton Hall",
+        "kenpom": "Seton Hall"
+      }
+    },
+    {
+      "name": "West Virginia",
+      "aliases": ["West Virginia Mountaineers", "WVU"],
+      "sources": {
+        "espn": "West Virginia Mountaineers",
+        "action_network": "West Virginia",
+        "kenpom": "West Virginia"
+      }
+    },
+    {
+      "name": "Oklahoma State",
+      "aliases": ["Oklahoma State Cowboys", "Oklahoma St."],
+      "sources": {
+        "espn": "Oklahoma State Cowboys",
+        "action_network": "Oklahoma State",
+        "kenpom": "Oklahoma St."
+      }
+    },
+    {
+      "name": "Maryland",
+      "aliases": ["Maryland Terrapins", "Maryland"],
+      "sources": {
+        "espn": "Maryland Terrapins",
+        "action_network": "Maryland",
+        "kenpom": "Maryland"
+      }
+    },
+    {
+      "name": "LSU",
+      "aliases": ["LSU Tigers", "Louisiana State"],
+      "sources": {
+        "espn": "LSU Tigers",
+        "action_network": "LSU",
+        "kenpom": "LSU"
+      }
+    },
+    {
+      "name": "Florida State",
+      "aliases": ["Florida State Seminoles", "Florida St."],
+      "sources": {
+        "espn": "Florida State Seminoles",
+        "action_network": "Florida State",
+        "kenpom": "Florida St."
+      }
+    },
+    {
+      "name": "Oregon State",
+      "aliases": ["Oregon State Beavers", "Oregon St."],
+      "sources": {
+        "espn": "Oregon State Beavers",
+        "action_network": "Oregon State",
+        "kenpom": "Oregon St."
+      }
+    },
+    {
+      "name": "Georgetown",
+      "aliases": ["Georgetown Hoyas", "Georgetown"],
+      "sources": {
+        "espn": "Georgetown Hoyas",
+        "action_network": "Georgetown",
+        "kenpom": "Georgetown"
+      }
+    },
+    {
+      "name": "Wichita State",
+      "aliases": ["Wichita State Shockers", "Wichita St."],
+      "sources": {
+        "espn": "Wichita State Shockers",
+        "action_network": "Wichita State",
+        "kenpom": "Wichita St."
+      }
+    },
+    {
+      "name": "Winthrop",
+      "aliases": ["Winthrop Eagles", "Winthrop"],
+      "sources": {
+        "espn": "Winthrop Eagles",
+        "action_network": "Winthrop",
+        "kenpom": "Winthrop"
+      }
+    },
+    {
+      "name": "UC Santa Barbara",
+      "aliases": ["UC Santa Barbara Gauchos", "UCSB"],
+      "sources": {
+        "espn": "UC Santa Barbara Gauchos",
+        "action_network": "UC Santa Barbara",
+        "kenpom": "UC Santa Barbara"
+      }
+    },
+    {
+      "name": "Liberty",
+      "aliases": ["Liberty Flames", "Liberty"],
+      "sources": {
+        "espn": "Liberty Flames",
+        "action_network": "Liberty",
+        "kenpom": "Liberty"
+      }
+    },
+    {
+      "name": "Abilene Christian",
+      "aliases": ["Abilene Christian Wildcats", "ACU"],
+      "sources": {
+        "espn": "Abilene Christian Wildcats",
+        "action_network": "Abilene Christian",
+        "kenpom": "Abilene Christian"
+      }
+    },
+    {
+      "name": "Morehead State",
+      "aliases": ["Morehead State Eagles", "Morehead St."],
+      "sources": {
+        "espn": "Morehead State Eagles",
+        "action_network": "Morehead State",
+        "kenpom": "Morehead St."
+      }
+    },
+    {
+      "name": "Yale",
+      "aliases": ["Yale Bulldogs", "Yale"],
+      "sources": {
+        "espn": "Yale Bulldogs",
+        "action_network": "Yale",
+        "kenpom": "Yale"
+      }
+    },
+    {
+      "name": "South Dakota State",
+      "aliases": ["South Dakota State Jackrabbits", "South Dakota St."],
+      "sources": {
+        "espn": "South Dakota State Jackrabbits",
+        "action_network": "South Dakota State",
+        "kenpom": "South Dakota St."
+      }
+    },
+    {
+      "name": "Wagner",
+      "aliases": ["Wagner Seahawks", "Wagner"],
+      "sources": {
+        "espn": "Wagner Seahawks",
+        "action_network": "Wagner",
+        "kenpom": "Wagner"
+      }
+    },
+    {
+      "name": "Howard",
+      "aliases": ["Howard Bison", "Howard"],
+      "sources": {
+        "espn": "Howard Bison",
+        "action_network": "Howard",
+        "kenpom": "Howard"
+      }
+    },
+    {
+      "name": "Longwood",
+      "aliases": ["Longwood Lancers", "Longwood"],
+      "sources": {
+        "espn": "Longwood Lancers",
+        "action_network": "Longwood",
+        "kenpom": "Longwood"
+      }
+    },
+    {
+      "name": "Grambling",
+      "aliases": ["Grambling State Tigers", "Grambling State", "Grambling St.", "Grambling Tigers"],
+      "sources": {
+        "espn": "Grambling Tigers",
+        "action_network": "Grambling State",
+        "kenpom": "Grambling St."
+      }
+    },
+    {
+      "name": "Iowa",
+      "aliases": ["Iowa Hawkeyes", "Iowa"],
+      "sources": {
+        "espn": "Iowa Hawkeyes",
+        "action_network": "Iowa",
+        "kenpom": "Iowa"
+      }
+    },
+    {
+      "name": "Wisconsin",
+      "aliases": ["Wisconsin Badgers", "Wisconsin"],
+      "sources": {
+        "espn": "Wisconsin Badgers",
+        "action_network": "Wisconsin",
+        "kenpom": "Wisconsin"
+      }
+    },
+    {
+      "name": "Missouri",
+      "aliases": ["Missouri Tigers", "Missouri", "Mizzou"],
+      "sources": {
+        "espn": "Missouri Tigers",
+        "action_network": "Missouri",
+        "kenpom": "Missouri"
+      }
+    },
+    {
+      "name": "Indiana",
+      "aliases": ["Indiana Hoosiers", "Indiana"],
+      "sources": {
+        "espn": "Indiana Hoosiers",
+        "action_network": "Indiana",
+        "kenpom": "Indiana"
+      }
+    },
+    {
+      "name": "Penn State",
+      "aliases": ["Penn State Nittany Lions", "Penn St."],
+      "sources": {
+        "espn": "Penn State Nittany Lions",
+        "action_network": "Penn State",
+        "kenpom": "Penn St."
+      }
+    },
+    {
+      "name": "Mississippi",
+      "aliases": ["Ole Miss Rebels", "Ole Miss", "Mississippi"],
+      "sources": {
+        "espn": "Ole Miss Rebels",
+        "action_network": "Ole Miss",
+        "kenpom": "Mississippi"
+      }
+    },
+    {
+      "name": "Georgia",
+      "aliases": ["Georgia Bulldogs", "Georgia"],
+      "sources": {
+        "espn": "Georgia Bulldogs",
+        "action_network": "Georgia",
+        "kenpom": "Georgia"
+      }
+    },
+    {
+      "name": "Oklahoma",
+      "aliases": ["Oklahoma Sooners", "Oklahoma"],
+      "sources": {
+        "espn": "Oklahoma Sooners",
+        "action_network": "Oklahoma",
+        "kenpom": "Oklahoma"
+      }
+    },
+    {
+      "name": "Dayton",
+      "aliases": ["Dayton Flyers", "Dayton"],
+      "sources": {
+        "espn": "Dayton Flyers",
+        "action_network": "Dayton",
+        "kenpom": "Dayton"
+      }
+    },
+    {
+      "name": "Pittsburgh",
+      "aliases": ["Pittsburgh Panthers", "Pitt"],
+      "sources": {
+        "espn": "Pittsburgh Panthers",
+        "action_network": "Pittsburgh",
+        "kenpom": "Pittsburgh"
+      }
+    },
+    {
+      "name": "Wake Forest",
+      "aliases": ["Wake Forest Demon Deacons", "Wake Forest"],
+      "sources": {
+        "espn": "Wake Forest Demon Deacons",
+        "action_network": "Wake Forest",
+        "kenpom": "Wake Forest"
+      }
+    },
+    {
+      "name": "Vanderbilt",
+      "aliases": ["Vanderbilt Commodores", "Vanderbilt"],
+      "sources": {
+        "espn": "Vanderbilt Commodores",
+        "action_network": "Vanderbilt",
+        "kenpom": "Vanderbilt"
+      }
+    }
+  ]
+}
