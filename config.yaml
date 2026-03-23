@@ -1,0 +1,32 @@
+groups:
+  cbb: [espn, action_network]
+  tennis: [sofascore, the_odds_api]
+
+scrapers:
+  espn:
+    name: espn
+    enabled: true
+    sport: cbb
+    bucket: cbb-scores-490420
+    gcs_object: scores.json
+
+  action_network:
+    name: action_network
+    enabled: true
+    sport: cbb
+    bucket: cbb-scores-490420
+    gcs_object: odds.json
+
+  sofascore:
+    name: sofascore
+    enabled: true
+    sport: tennis
+    bucket: tennisabstract-scraper-sports-data
+    gcs_object: matches.json
+
+  the_odds_api:
+    name: the_odds_api
+    enabled: true
+    sport: tennis
+    bucket: tennisabstract-scraper-sports-data
+    gcs_object: tennis_odds.json
