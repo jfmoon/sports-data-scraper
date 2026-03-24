@@ -425,9 +425,68 @@ class TestFindTeamRatingsTable:
 
 class TestRequiredHeaders:
     def test_required_headers_set(self):
-        assert REQUIRED_HEADERS == {"Team", "O-Rate", "D-Rate"}
+        assert REQUIRED_HEADERS == {"Team", "O-Rate", "D-Rate", "Relative Rating"}
 
     def test_min_team_count_is_substantial(self):
         assert MIN_TEAM_COUNT >= 300, (
             "MIN_TEAM_COUNT should be >= 300 to catch partial loads"
         )
+
+
+# ---------------------------------------------------------------------------
+# Additional tests for fixes applied after live inspection
+# ---------------------------------------------------------------------------
+
+class TestCleanCell:
+    def test_plain_team_name(self):
+        from scrapers.cbb.evanmiya_scraper import _clean_cell
+        assert _clean_cell("Duke") == "Duke"
+
+    def test_strips_emoji_and_json(self):
+        from scrapers.cbb.evanmiya_scraper import _clean_cell
+        raw = 'Duke \U0001f3c0{"x":{"opts":{"theme":"light","content":"Still alive"}}}'
+        assert _clean_cell(raw) == "Duke"
+
+    def test_strips_multiple_trailing_emoji(self):
+        from scrapers.cbb.evanmiya_scraper import _clean_cell
+        raw = 'Michigan \U0001f3c0\U0001f3c6{"x":{}}'
+        assert _clean_cell(raw) == "Michigan"
+
+    def test_no_emoji_passthrough(self):
+        from scrapers.cbb.evanmiya_scraper import _clean_cell
+        assert _clean_cell("Iowa State") == "Iowa State"
+
+    def test_numeric_cell_unchanged(self):
+        from scrapers.cbb.evanmiya_scraper import _clean_cell
+        assert _clean_cell("17.3") == "17.3"
+
+
+class TestRelativeRankingHeader:
+    def test_relative_ranking_in_header_map(self):
+        from scrapers.cbb.evanmiya_scraper import HEADER_MAP
+        assert HEADER_MAP["Relative Ranking"] == "rank"
+
+    def test_relative_rating_in_required_headers(self):
+        from scrapers.cbb.evanmiya_scraper import REQUIRED_HEADERS
+        assert "Relative Rating" in REQUIRED_HEADERS
+
+    def test_full_table_headers_all_mapped(self):
+        from scrapers.cbb.evanmiya_scraper import HEADER_MAP
+        # All headers observed in the live full table
+        live_headers = [
+            "Relative Ranking", "Team", "O-Rate", "D-Rate",
+            "Relative Rating", "Opponent Adjust", "Pace Adjust",
+            "Off Rank", "Def Rank", "True Tempo", "Tempo Rank",
+            "Injury Rank", "Home Rank", "Roster Rank",
+        ]
+        unmapped = [h for h in live_headers if h not in HEADER_MAP and h != "Team"]
+        # Team maps to "name" via HEADER_MAP["Team"]
+        assert "Team" in HEADER_MAP
+        assert unmapped == [], f"Unmapped live headers: {unmapped}"
+
+    def test_pane_selector_constant(self):
+        # Ensures the scoping selector hasn't been removed
+        import inspect
+        import scrapers.cbb.evanmiya_scraper as m
+        src = inspect.getsource(m._find_team_ratings_table)
+        assert "shiny-tab-team_ratings" in src

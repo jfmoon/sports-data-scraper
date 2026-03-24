@@ -63,7 +63,7 @@ logger = logging.getLogger(__name__)
 # Configuration
 # ---------------------------------------------------------------------------
 
-TEAM_RATINGS_URL = "https://evanmiya.com/?ratings=team-ratings"
+TEAM_RATINGS_URL = "https://evanmiya.com/?team_ratings"
 
 # Saved session state — reused across runs to avoid repeated manual login
 STATE_FILE = Path("data/evanmiya_auth_state.json")
@@ -87,12 +87,13 @@ SEL_HEADER = ".rt-th"
 SEL_CELL   = ".rt-td"
 
 # Columns that MUST be present for the scrape to be valid
-REQUIRED_HEADERS = {"Team", "O-Rate", "D-Rate"}
+REQUIRED_HEADERS = {"Team", "O-Rate", "D-Rate", "Relative Rating"}
 
 # Visible header label → output field name.
 # Header cells have tooltip JSON appended after the visible label; strip from '{'.
 HEADER_MAP: dict[str, str] = {
     "Rank":            "rank",
+    "Relative Ranking": "rank",
     "Team":            "name",
     "O-Rate":          "o_rate",
     "D-Rate":          "d_rate",
@@ -125,6 +126,22 @@ def _clean_header(raw: str) -> str:
     return raw.split("{")[0].strip()
 
 
+def _clean_cell(raw: str) -> str:
+    """
+    Strip tooltip JSON and trailing emoji/noise from a Reactable cell value.
+
+    Team cells may contain appended emoji + tooltip JSON, e.g.:
+        'Duke \U0001f3c0{"x":{"opts":...}}'
+    We strip from the first '{' then rstrip whitespace and stray emoji.
+    """
+    text = raw.split("{")[0].strip()
+    # Remove any trailing non-ASCII characters (emoji appended before the JSON)
+    text = text.rstrip()
+    while text and ord(text[-1]) > 127:
+        text = text[:-1].rstrip()
+    return text
+
+
 def _to_float(val: str) -> Optional[float]:
     try:
         return float(val.replace(",", "").strip())
@@ -151,8 +168,17 @@ def _find_team_ratings_table(page):
     Find the Reactable table whose headers include 'Team' and 'O-Rate'/'D-Rate'.
     Returns the first matching Playwright ElementHandle, or None.
     """
-    tables = page.query_selector_all(SEL_TABLE)
-    logger.debug("Found %d ReactTable elements", len(tables))
+    # Scope search strictly to #shiny-tab-team_ratings.
+    # Do NOT fall back to full page — the homepage preview table would be found instead.
+    pane = page.query_selector("#shiny-tab-team_ratings")
+    if pane is None:
+        raise ValueError(
+            "EvanMiya: #shiny-tab-team_ratings pane not found. "
+            "The page may not have loaded or the session may be stale. "
+            "Re-run with --login to refresh the session."
+        )
+    tables = pane.query_selector_all(SEL_TABLE)
+    logger.debug("Found %d ReactTable elements in team ratings pane", len(tables))
 
     for i, table in enumerate(tables):
         header_els = table.query_selector_all(SEL_HEADER)
@@ -194,7 +220,7 @@ def _extract_raw_rows(table) -> tuple[list[str], list[dict[str, str]]]:
     rows = []
     for row in row_els:
         cells = row.query_selector_all(SEL_CELL)
-        vals  = [c.inner_text().strip() for c in cells]
+        vals  = [_clean_cell(c.inner_text()) for c in cells]
         if len(vals) < len(cleaned_headers):
             logger.debug("Skipping short row (%d cells): %s", len(vals), vals)
             continue
@@ -245,20 +271,73 @@ def _login_and_save_state(page, context) -> None:
 
 def _wait_for_render(page) -> None:
     """
-    Wait for the Shiny app to settle after navigation.
+    Wait for the Shiny app to settle and the team ratings table to appear.
 
-    Uses networkidle + fixed dwell (time.sleep) rather than wait_for_selector
-    on Reactable rows. The Shiny/Reactable table re-renders multiple times
-    during load, causing wait_for_selector to loop indefinitely on elements
-    that keep resolving but never become stable.
+    Waits for the table inside #shiny-tab-team_ratings specifically, with a
+    fixed dwell after it appears. Using wait_for_selector on the scoped
+    selector avoids the loop issue (which occurred when waiting on any
+    .rt-tr-group — the homepage preview tables kept re-resolving).
     """
     try:
         page.wait_for_load_state("networkidle", timeout=15_000)
     except Exception:
-        pass  # networkidle may not fully settle on Shiny apps — dwell handles it
+        pass
 
-    logger.debug("Settling for %ds after networkidle...", RENDER_SETTLE_S)
+    # Wait for the table specifically inside the team ratings pane
+    try:
+        page.wait_for_selector(
+            "#shiny-tab-team_ratings .ReactTable",
+            timeout=30_000,
+            state="attached",
+        )
+    except Exception:
+        pass  # fall through to dwell — table may still be there
+
+    logger.debug("Settling for %ds after table detected...", RENDER_SETTLE_S)
     time.sleep(RENDER_SETTLE_S)
+
+
+# ---------------------------------------------------------------------------
+# Page size
+# ---------------------------------------------------------------------------
+
+def _set_page_size(page, size: int = 500, timeout_s: int = 15) -> None:
+    """
+    Set the Reactable page size select to show all rows, then poll until
+    the row count exceeds the default 50.
+
+    The table defaults to 50 rows per page. Setting to 500 exposes all
+    ~365 D-I teams. We poll rather than use a fixed sleep because re-render
+    time varies.
+    """
+    page.evaluate(
+        """(size) => {
+            const pane = document.getElementById('shiny-tab-team_ratings');
+            const sel = pane?.querySelector('.rt-page-size-select');
+            if (sel) {
+                sel.value = String(size);
+                sel.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }""",
+        size,
+    )
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        row_count = page.evaluate(
+            """() => {
+                const pane = document.getElementById('shiny-tab-team_ratings');
+                return pane?.querySelector('.ReactTable')
+                    ?.querySelectorAll('.rt-tr-group').length ?? 0;
+            }"""
+        )
+        if row_count > 50:
+            logger.info("EvanMiya: page size set — %d rows now visible", row_count)
+            return
+        time.sleep(0.5)
+    logger.warning(
+        "EvanMiya: timed out waiting for >50 rows after setting page size — "
+        "proceeding with %d rows", row_count if 'row_count' in dir() else 0
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -341,6 +420,7 @@ def scrape_evanmiya(visible: bool = True, force_login: bool = False) -> list[dic
                 "If this persists, run with --login to refresh the session."
             )
 
+        _set_page_size(page)
         cleaned_headers, raw_rows = _extract_raw_rows(table)
         logger.info("EvanMiya: extracted %d raw rows", len(raw_rows))
 

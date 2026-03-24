@@ -76,9 +76,22 @@ def _preprocess(name: str, source: str | None) -> str:
             tokens[-1] = tokens[-1][:-3].strip()
         cleaned = " ".join(tokens)
     elif source == "evanmiya":
-        cleaned = cleaned.split("(")[0].strip()
+        # Normalize known parenthetical state/region disambiguators before stripping
+        # so that "Miami (Fla.)" → "Miami (FL)" and "Miami (Ohio)" → "Miami (Ohio)"
+        # rather than both collapsing to bare "Miami"
+        EVANMIYA_PAREN_MAP = {
+            "(Fla.)": "(FL)",
+            "(Fla)":  "(FL)",
+            "(OH)":   "(Ohio)",
+        }
+        for raw_paren, canonical_paren in EVANMIYA_PAREN_MAP.items():
+            if raw_paren in cleaned:
+                cleaned = cleaned.replace(raw_paren, canonical_paren).strip()
+                break
+        else:
+            # No known disambiguation — safe to strip parens
+            cleaned = cleaned.split("(")[0].strip()
     return cleaned
-
 
 # ---------------------------------------------------------------------------
 # Public API

@@ -140,10 +140,12 @@
       "name": "Arkansas Pine Bluff",
       "aliases": [
         "Arkansas-Pine Bluff Golden Lions",
-        "UAPB"
+        "UAPB",
+        "Arkansas-Pine Bluff"
       ],
       "sources": {
-        "torvik": "Arkansas Pine Bluff"
+        "torvik": "Arkansas Pine Bluff",
+        "evanmiya": "Arkansas-Pine Bluff"
       }
     },
     {
@@ -706,10 +708,12 @@
     {
       "name": "Detroit Mercy",
       "aliases": [
-        "Detroit Mercy Titans"
+        "Detroit Mercy Titans",
+        "Detroit"
       ],
       "sources": {
-        "torvik": "Detroit Mercy"
+        "torvik": "Detroit Mercy",
+        "evanmiya": "Detroit"
       }
     },
     {
@@ -1410,10 +1414,12 @@
       "name": "LIU",
       "aliases": [
         "LIU Sharks",
-        "Long Island University"
+        "Long Island University",
+        "Long Island"
       ],
       "sources": {
-        "torvik": "LIU"
+        "torvik": "LIU",
+        "evanmiya": "Long Island"
       }
     },
     {
@@ -1542,20 +1548,24 @@
       "aliases": [
         "Louisiana Ragin Cajuns",
         "UL Lafayette",
-        "ULL"
+        "ULL",
+        "Louisiana-Lafayette"
       ],
       "sources": {
-        "torvik": "Louisiana"
+        "torvik": "Louisiana",
+        "evanmiya": "Louisiana-Lafayette"
       }
     },
     {
       "name": "Louisiana Monroe",
       "aliases": [
         "Louisiana Monroe Warhawks",
-        "ULM"
+        "ULM",
+        "Louisiana-Monroe"
       ],
       "sources": {
-        "torvik": "Louisiana Monroe"
+        "torvik": "Louisiana Monroe",
+        "evanmiya": "Louisiana-Monroe"
       }
     },
     {
@@ -1673,10 +1683,12 @@
       "name": "Maryland Eastern Shore",
       "aliases": [
         "Maryland-Eastern Shore Hawks",
-        "UMES"
+        "UMES",
+        "Maryland-Eastern Shore"
       ],
       "sources": {
-        "torvik": "Maryland Eastern Shore"
+        "torvik": "Maryland Eastern Shore",
+        "evanmiya": "Maryland-Eastern Shore"
       }
     },
     {
@@ -1746,12 +1758,14 @@
       "aliases": [
         "Miami Hurricanes",
         "Miami FL",
-        "Miami (FL) Hurricanes"
+        "Miami (FL) Hurricanes",
+        "Miami (Fla.)"
       ],
       "sources": {
         "espn": "Miami Hurricanes",
         "action_network": "Miami (FL)",
-        "kenpom": "Miami FL"
+        "kenpom": "Miami FL",
+        "evanmiya": "Miami (Fla.)"
       }
     },
     {
@@ -1999,10 +2013,12 @@
       "name": "Nebraska Omaha",
       "aliases": [
         "Omaha Mavericks",
-        "UNO"
+        "UNO",
+        "Omaha"
       ],
       "sources": {
-        "torvik": "Nebraska Omaha"
+        "torvik": "Nebraska Omaha",
+        "evanmiya": "Omaha"
       }
     },
     {
@@ -2452,10 +2468,12 @@
       "name": "Prairie View A&M",
       "aliases": [
         "Prairie View A&M Panthers",
-        "PVAMU"
+        "PVAMU",
+        "Prairie View"
       ],
       "sources": {
-        "torvik": "Prairie View A&M"
+        "torvik": "Prairie View A&M",
+        "evanmiya": "Prairie View"
       }
     },
     {
@@ -2507,10 +2525,12 @@
       "name": "Purdue Fort Wayne",
       "aliases": [
         "Purdue Fort Wayne Mastodons",
-        "PFW"
+        "PFW",
+        "Fort Wayne"
       ],
       "sources": {
-        "torvik": "Purdue Fort Wayne"
+        "torvik": "Purdue Fort Wayne",
+        "evanmiya": "Fort Wayne"
       }
     },
     {
@@ -2705,10 +2725,12 @@
       "aliases": [
         "Sam Houston Bearkats",
         "Sam Houston St.",
-        "SHSU"
+        "SHSU",
+        "Sam Houston State"
       ],
       "sources": {
-        "torvik": "Sam Houston St."
+        "torvik": "Sam Houston St.",
+        "evanmiya": "Sam Houston State"
       }
     },
     {
@@ -2926,10 +2948,12 @@
       "name": "Southern Miss",
       "aliases": [
         "Southern Miss Golden Eagles",
-        "USM"
+        "USM",
+        "Southern Mississippi"
       ],
       "sources": {
-        "torvik": "Southern Miss"
+        "torvik": "Southern Miss",
+        "evanmiya": "Southern Mississippi"
       }
     },
     {
@@ -3078,10 +3102,12 @@
       "name": "Tennessee Martin",
       "aliases": [
         "Tennessee-Martin Skyhawks",
-        "UT Martin"
+        "UT Martin",
+        "Tennessee-Martin"
       ],
       "sources": {
-        "torvik": "Tennessee Martin"
+        "torvik": "Tennessee Martin",
+        "evanmiya": "Tennessee-Martin"
       }
     },
     {
@@ -3131,10 +3157,12 @@
       "name": "Texas A&M Corpus Christi",
       "aliases": [
         "Texas A&M-Corpus Christi Islanders",
-        "Texas A&M Corpus Chris"
+        "Texas A&M Corpus Chris",
+        "Texas A&M-Corpus Christi"
       ],
       "sources": {
-        "torvik": "Texas A&M Corpus Chris"
+        "torvik": "Texas A&M Corpus Chris",
+        "evanmiya": "Texas A&M-Corpus Christi"
       }
     },
     {
@@ -3403,10 +3431,12 @@
     {
       "name": "USC Upstate",
       "aliases": [
-        "USC Upstate Spartans"
+        "USC Upstate Spartans",
+        "South Carolina Upstate"
       ],
       "sources": {
-        "torvik": "USC Upstate"
+        "torvik": "USC Upstate",
+        "evanmiya": "South Carolina Upstate"
       }
     },
     {
@@ -3423,10 +3453,12 @@
       "name": "UT Rio Grande Valley",
       "aliases": [
         "UT Rio Grande Valley Vaqueros",
-        "UTRGV"
+        "UTRGV",
+        "Texas-Rio Grande Valley"
       ],
       "sources": {
-        "torvik": "UT Rio Grande Valley"
+        "torvik": "UT Rio Grande Valley",
+        "evanmiya": "Texas-Rio Grande Valley"
       }
     },
     {
