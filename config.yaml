@@ -1,5 +1,5 @@
 groups:
-  cbb:    [espn, action_network, kenpom, evanmiya]
+  cbb:    [espn, action_network, kenpom, evanmiya, torvik]
   tennis: [sofascore, the_odds_api, tennisabstract]
 
 scrapers:
@@ -23,7 +23,7 @@ scrapers:
     sport: cbb
     bucket: sports-data-scraper-491116
     gcs_object: cbb/kenpom.json
-    top: 68
+    top: 150
     fanmatch: false
     fanmatch_date: null
 
@@ -33,6 +33,15 @@ scrapers:
     sport: cbb
     bucket: sports-data-scraper-491116
     gcs_object: cbb/evanmiya.json
+
+  torvik:
+    name: torvik
+    enabled: true
+    sport: cbb
+    bucket: sports-data-scraper-491116
+    gcs_object: cbb/torvik_team.json
+    split_presets: [full_season, last_10]
+    year: 2026
 
   sofascore:
     name: sofascore

@@ -1,195 +1,134 @@
-"""
-scrapers/cbb/names.py
-
-Centralized CBB team name canonicalization for the sports-data-scraper repo.
-
-ALL CBB scrapers (kenpom.py, espn.py, action_network.py) must pass team names
-through `to_canonical()` before writing to GCS. This ensures kenpom.json,
-scores.json, and odds.json all use identical team name strings, eliminating
-the need for fuzzy resolution in the analysis layer.
-
-Canonical form: the name as it appears in ESPN and Action Network sources,
-since those are less flexible than KenPom. KenPom abbreviations are mapped
-to match the downstream sources.
-
-To add a mapping: add an entry to ALIAS_MAP with the raw source name as key
-and the canonical name as value. Do not maintain a separate crosswalk file —
-this is the single source of truth for CBB team names.
-"""
-
+import json
+import os
 import logging
 
 logger = logging.getLogger(__name__)
 
-# ── Alias → Canonical map ─────────────────────────────────────────────────────
-# Keys: raw names as they appear from any source (KenPom, ESPN, Action Network)
-# Values: canonical name used in all GCS output
-#
-# Sourced from KenPom abbreviations vs ESPN/Action Network full names.
-# Extend this list whenever a new mismatch is detected in pipeline logs.
+# ---------------------------------------------------------------------------
+# Load crosswalk
+# ---------------------------------------------------------------------------
+# Schema: {"canonical": [{"name": "Iowa State", "aliases": [...], "sources": {...}}, ...]}
+# We expand this into two flat lookup structures at import time:
+#   KNOWN_CANONICAL_TEAMS — set of canonical name strings for O(1) membership checks
+#   _alias_to_canonical   — dict mapping every alias (and canonical name itself) → canonical name
 
-ALIAS_MAP: dict[str, str] = {
-    # KenPom abbreviations → canonical
-    "Abilene Chr.":          "Abilene Christian",
-    "Albany":                "Albany (NY)",
-    "App State":             "Appalachian State",
-    "Ark.-Pine Bluff":       "Arkansas-Pine Bluff",
-    "Army West Point":       "Army",
-    "Boise St.":             "Boise State",
-    "Boston U.":             "Boston University",
-    "Cal Baptist":           "California Baptist",
-    "Cal Poly":              "Cal Poly",
-    "Cal St. Bakersfield":   "Cal State Bakersfield",
-    "Cal St. Fullerton":     "Cal State Fullerton",
-    "Cal St. Northridge":    "Cal State Northridge",
-    "Central Conn. St.":     "Central Connecticut",
-    "Charleston So.":        "Charleston Southern",
-    "Cleveland St.":         "Cleveland State",
-    "Col. of Charleston":    "College of Charleston",
-    "Colorado St.":          "Colorado State",
-    "Connecticut":           "UConn",
-    "Coppin St.":            "Coppin State",
-    "Cornell":               "Cornell",
-    "Eastern Ill.":          "Eastern Illinois",
-    "Eastern Ky.":           "Eastern Kentucky",
-    "Eastern Mich.":         "Eastern Michigan",
-    "Eastern Wash.":         "Eastern Washington",
-    "Fla. Atlantic":         "Florida Atlantic",
-    "Fla. Gulf Coast":       "Florida Gulf Coast",
-    "Florida St.":           "Florida State",
-    "Fresno St.":            "Fresno State",
-    "Ga. Southern":          "Georgia Southern",
-    "Ga. Tech":              "Georgia Tech",
-    "Gardner-Webb":          "Gardner-Webb",
-    "Grambling":             "Grambling State",
-    "Grand Canyon":          "Grand Canyon",
-    "Idaho St.":             "Idaho State",
-    "Illinois St.":          "Illinois State",
-    "Indiana St.":           "Indiana State",
-    "Iowa St.":              "Iowa State",
-    "Jackson St.":           "Jackson State",
-    "Jacksonville St.":      "Jacksonville State",
-    "Kansas St.":            "Kansas State",
-    "Kennesaw St.":          "Kennesaw State",
-    "Kent St.":              "Kent State",
-    "Long Island":           "LIU",
-    "Loyola-Chicago":        "Loyola Chicago",
-    "LSU":                   "LSU",
-    "Md.-Eastern Shore":     "Maryland-Eastern Shore",
-    "Miami (FL)":            "Miami",
-    "Miami (OH)":            "Miami (OH)",
-    "Michigan St.":          "Michigan State",
-    "Middle Tenn.":          "Middle Tennessee",
-    "Mississippi St.":       "Mississippi State",
-    "Missouri St.":          "Missouri State",
-    "Montana St.":           "Montana State",
-    "Morehead St.":          "Morehead State",
-    "Morgan St.":            "Morgan State",
-    "Murray St.":            "Murray State",
-    "N.C. A&T":              "North Carolina A&T",
-    "N.C. Central":          "North Carolina Central",
-    "N.C. State":            "NC State",
-    "N.C.-Asheville":        "UNC Asheville",
-    "N.C.-Greensboro":       "UNC Greensboro",
-    "N.C.-Wilmington":       "UNC Wilmington",
-    "N.J.I.T.":              "NJIT",
-    "N.M. State":            "New Mexico State",
-    "NC State":              "NC State",
-    "New Mexico St.":        "New Mexico State",
-    "Nicholls St.":          "Nicholls State",
-    "Norfolk St.":           "Norfolk State",
-    "North Dakota St.":      "North Dakota State",
-    "Northern Ariz.":        "Northern Arizona",
-    "Northern Colo.":        "Northern Colorado",
-    "Northern Ill.":         "Northern Illinois",
-    "Northern Iowa":         "Northern Iowa",
-    "Northwestern St.":      "Northwestern State",
-    "Ohio St.":              "Ohio State",
-    "Oklahoma St.":          "Oklahoma State",
-    "Oregon St.":            "Oregon State",
-    "Penn St.":              "Penn State",
-    "Portland St.":          "Portland State",
-    "Prairie View":          "Prairie View A&M",
-    "Sacramento St.":        "Sacramento State",
-    "Saint Louis":           "Saint Louis",
-    "Sam Houston":           "Sam Houston State",
-    "Sam Houston St.":       "Sam Houston State",
-    "San Diego St.":         "San Diego State",
-    "San Jose St.":          "San Jose State",
-    "Savannah St.":          "Savannah State",
-    "SE Missouri St.":       "Southeast Missouri State",
-    "Seattle U.":            "Seattle",
-    "Seton Hall":            "Seton Hall",
-    "SIU Edwardsville":      "SIU Edwardsville",
-    "South Dakota St.":      "South Dakota State",
-    "Southeast Mo. St.":     "Southeast Missouri State",
-    "Southern Ill.":         "Southern Illinois",
-    "Southern Miss.":        "Southern Miss",
-    "Southern U.":           "Southern",
-    "St. Bonaventure":       "St. Bonaventure",
-    "St. John's":            "St. John's",
-    "St. Peter's":           "Saint Peter's",
-    "Stephen F. Austin":     "Stephen F. Austin",
-    "Stetson":               "Stetson",
-    "Stony Brook":           "Stony Brook",
-    "TCU":                   "TCU",
-    "Tennessee St.":         "Tennessee State",
-    "Tennessee Tech":        "Tennessee Tech",
-    "Texas A&M-CC":          "Texas A&M-Corpus Christi",
-    "Texas A&M-Corpus Christi": "Texas A&M-Corpus Christi",
-    "Texas Southern":        "Texas Southern",
-    "Texas St.":             "Texas State",
-    "Troy":                  "Troy",
-    "UC Davis":              "UC Davis",
-    "UC Irvine":             "UC Irvine",
-    "UC Riverside":          "UC Riverside",
-    "UC San Diego":          "UC San Diego",
-    "UC Santa Barbara":      "UC Santa Barbara",
-    "UCLA":                  "UCLA",
-    "UIC":                   "Illinois-Chicago",
-    "UL Monroe":             "Louisiana-Monroe",
-    "UMass Lowell":          "UMass Lowell",
-    "UNC":                   "North Carolina",
-    "UNLV":                  "UNLV",
-    "UT Arlington":          "UT Arlington",
-    "UT Martin":             "UT Martin",
-    "Utah St.":              "Utah State",
-    "Utah Valley":           "Utah Valley",
-    "UTEP":                  "UTEP",
-    "UTSA":                  "UTSA",
-    "VCU":                   "VCU",
-    "VMI":                   "VMI",
-    "W. Kentucky":           "Western Kentucky",
-    "W. Michigan":           "Western Michigan",
-    "Wichita St.":           "Wichita State",
-    "Winston-Salem":         "Winston-Salem State",
-    "Wis.-Green Bay":        "Green Bay",
-    "Wis.-Milwaukee":        "Milwaukee",
-    "Wright St.":            "Wright State",
-    "Youngstown St.":        "Youngstown State",
+CROSSWALK_PATH = os.path.join(os.path.dirname(__file__), "../../data/crosswalks/cbb_teams.json")
+with open(CROSSWALK_PATH, "r") as f:
+    _raw = json.load(f)
+
+_teams: list = _raw.get("canonical", [])
+
+# Build flat alias → canonical lookup.
+# Includes: canonical name itself, all aliases[], all sources{} values.
+_alias_to_canonical: dict[str, str] = {}
+KNOWN_CANONICAL_TEAMS: set[str] = set()
+
+for entry in _teams:
+    canonical = entry["name"]
+    KNOWN_CANONICAL_TEAMS.add(canonical)
+
+    # canonical name maps to itself
+    _alias_to_canonical[canonical] = canonical
+
+    # all aliases
+    for alias in entry.get("aliases", []):
+        _alias_to_canonical[alias] = canonical
+
+    # all source-specific strings (espn, action_network, kenpom, etc.)
+    for src_name in entry.get("sources", {}).values():
+        _alias_to_canonical[src_name] = canonical
+
+# Crosswalk sanity check — guards against a completely empty or corrupted file.
+# This crosswalk is built incrementally from live scraper output, not seeded
+# with the full D-I universe, so we only assert a minimum floor.
+assert len(KNOWN_CANONICAL_TEAMS) >= 50, (
+    f"Crosswalk integrity failure: only {len(KNOWN_CANONICAL_TEAMS)} canonical teams loaded. "
+    f"The file may be empty or malformed: {CROSSWALK_PATH}"
+)
+
+# ---------------------------------------------------------------------------
+# Conference tokens for Torvik pre-processing
+# ---------------------------------------------------------------------------
+# Torvik appends the conference abbreviation after the team name; we strip it.
+CONFERENCES = {
+    "ACC", "SEC", "B10", "B12", "BE", "MWC", "AAC", "A10", "WCC",
+    "SBC", "MVC", "CUSA", "MAC", "BSKY", "BW", "ASUN", "SC", "CAA",
+    "MAAC", "OVC", "SUM", "SL", "WAC", "NEC", "MEAC", "SWAC",
+    "IVY", "HORIZON", "AE",
 }
 
 
-def to_canonical(name: str) -> str:
-    """
-    Return the canonical team name for any input name.
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
 
-    Performs an exact-match lookup in ALIAS_MAP first.
-    If not found, returns the name unchanged (it is already canonical,
-    or it is an unknown team that will surface as a join miss in logs).
+def _preprocess(name: str, source: str | None) -> str:
+    """Apply source-specific cleaning before alias lookup."""
+    cleaned = name.strip()
+    if source == "torvik":
+        if cleaned.endswith("(H)"):
+            cleaned = cleaned[:-3].strip()
+        tokens = cleaned.split()
+        if tokens and tokens[0].isdigit():
+            tokens = tokens[1:]          # drop leading rank number
+        if tokens and tokens[-1].upper() in CONFERENCES:
+            tokens = tokens[:-1]         # drop trailing conference token
+        cleaned = " ".join(tokens)
+    elif source == "evanmiya":
+        cleaned = cleaned.split("(")[0].strip()
+    return cleaned
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def to_canonical(name: str, source: str = None, strict: bool = False) -> str:
+    """
+    Resolve a raw team name to its canonical form.
+
+    The crosswalk covers canonical names, all known aliases, and every
+    source-specific string (ESPN, Action Network, KenPom, etc.), so a single
+    lookup handles all cases.
+
+    Legacy callers (ESPN, KenPom, Action Network):
+        to_canonical(name)
+        Returns the canonical string if found; otherwise logs a warning and
+        returns the original name unchanged — preserves existing behavior.
+
+    New strict callers (Torvik, EvanMiya):
+        to_canonical(name, source="torvik", strict=True)
+        Raises ValueError immediately on any unresolved name, halting the
+        scrape before any GCS write occurs.
 
     Args:
-        name: Raw team name from any CBB scraper source.
+        name:   Raw team name string from the source.
+        source: Scraper identifier for source-specific pre-processing.
+                Supported values: "torvik", "evanmiya". None = no pre-processing.
+        strict: If True, raise ValueError on unresolved names instead of
+                logging a warning and returning the original input.
 
     Returns:
         Canonical team name string.
+
+    Raises:
+        ValueError: Only when strict=True and the name cannot be resolved.
     """
-    if not name:
-        return name
-    canonical = ALIAS_MAP.get(name)
-    if canonical is None:
-        # Not in the alias map — name is either already canonical or unknown.
-        # Unknown names will produce join misses in cbb_projector; add them here
-        # when detected in pipeline logs.
-        return name
-    return canonical
+    cleaned = _preprocess(name, source)
+
+    # Single lookup covers canonical names, aliases, and source-specific strings.
+    if cleaned in _alias_to_canonical:
+        return _alias_to_canonical[cleaned]
+
+    # Unresolved — strict scrapers halt; legacy scrapers log and continue.
+    msg = (
+        f"Unresolved CBB team name from source='{source or 'unknown'}': "
+        f"'{name}' (cleaned: '{cleaned}'). "
+        f"Add to the aliases[] or sources{{}} for the correct team in "
+        f"data/crosswalks/cbb_teams.json."
+    )
+    if strict:
+        raise ValueError(f"CRITICAL: {msg}")
+
+    logger.warning(msg)
+    return name  # return original input, not cleaned, to preserve legacy behavior

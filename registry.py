@@ -15,3 +15,6 @@ SCRAPER_REGISTRY = {
     "the_odds_api":     TheOddsApiScraper,
     "tennisabstract":   TennisAbstractScraper,
 }
+
+from scrapers.cbb.torvik import TorvikScraper
+SCRAPER_REGISTRY["torvik"] = TorvikScraper
