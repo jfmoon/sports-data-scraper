@@ -145,3 +145,76 @@ scrapers:
     bucket: sports-data-scraper-491116
     gcs_object: nfl/odds.json
     primary_book_id: 15
+ 
+  # ---------------------------------------------------------------------------
+  # MLB
+  # ---------------------------------------------------------------------------
+  mlb_probables:
+    name: mlb_probables
+    enabled: true
+    sport: mlb
+    bucket: sports-data-scraper-491116
+    gcs_object: mlb/probables.json
+    days_ahead: 2
+ 
+  mlb_pitchers:
+    name: mlb_pitchers
+    enabled: true
+    sport: mlb
+    bucket: sports-data-scraper-491116
+    gcs_object: mlb/pitchers.json
+    min_ip: 10
+    # season: 2026
+ 
+  mlb_teams:
+    name: mlb_teams
+    enabled: true
+    sport: mlb
+    bucket: sports-data-scraper-491116
+    gcs_object: mlb/teams.json
+    # season: 2026
+ 
+  mlb_bullpen:
+    name: mlb_bullpen
+    enabled: true
+    sport: mlb
+    bucket: sports-data-scraper-491116
+    gcs_object: mlb/bullpen.json
+    min_ip: 20
+    # season: 2026
+ 
+  mlb_statcast_pitchers:
+    name: mlb_statcast_pitchers
+    enabled: true
+    sport: mlb
+    bucket: sports-data-scraper-491116
+    gcs_object: mlb/statcast_pitchers.json
+    min_pa: 20
+    # season: 2026
+ 
+  mlb_statcast_hitters:
+    name: mlb_statcast_hitters
+    enabled: true
+    sport: mlb
+    bucket: sports-data-scraper-491116
+    gcs_object: mlb/statcast_hitters.json
+    min_pa: 20
+    # season: 2026
+ 
+  mlb_weather:
+    name: mlb_weather
+    enabled: true
+    sport: mlb
+    bucket: sports-data-scraper-491116
+    gcs_object: mlb/weather.json
+    days_ahead: 2
+    game_hour: 19
+    # MLB_WEATHER_PROVIDER env var: "open_meteo" (default, no API key required)
+ 
+  mlb_lineups:
+    name: mlb_lineups
+    enabled: true
+    sport: mlb
+    bucket: sports-data-scraper-491116
+    gcs_object: mlb/lineups.json
+    days_ahead: 1
