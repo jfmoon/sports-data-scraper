@@ -724,22 +724,38 @@ def main():
 
     print(f"🎾 Scraping {len(players_to_scrape)} WTA players from Tennis Abstract...")
 
-    # ── Single persistent browser for the full run ────────────────────────────
-    # Avoids launching/closing a browser per player (250x overhead).
-    # Stealth is applied once to the context and persists across all page loads.
+    # ── Browser session management ───────────────────────────────────────────
+    # Recycle the browser every RECYCLE_EVERY players to reset the Cloudflare
+    # session fingerprint. Without recycling, Cloudflare rate-limits the session
+    # mid-run and all subsequent players fail. Each new context gets a fresh
+    # stealth patch and a short pause to avoid triggering burst detection.
+    RECYCLE_EVERY = 20
+
     from playwright.sync_api import sync_playwright
     from playwright_stealth import Stealth
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+    def make_page(playwright_instance):
+        """Launch a fresh stealth browser context and return (browser, page)."""
+        browser = playwright_instance.chromium.launch(headless=True)
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             viewport={"width": 1280, "height": 800},
         )
-        pw_page = context.new_page()
-        Stealth().apply_stealth_sync(pw_page)
+        page = context.new_page()
+        Stealth().apply_stealth_sync(page)
+        return browser, page
+
+    with sync_playwright() as p:
+        browser, pw_page = make_page(p)
 
         for i, player in enumerate(players_to_scrape):
+            # Recycle browser session periodically
+            if i > 0 and i % RECYCLE_EVERY == 0:
+                print(f"  ♻️  Recycling browser session after {i} players...")
+                browser.close()
+                time.sleep(random.uniform(3.0, 6.0))  # pause before fresh session
+                browser, pw_page = make_page(p)
+
             try:
                 result = scrape_player(player, debug=debug, page=pw_page)
                 if result:
