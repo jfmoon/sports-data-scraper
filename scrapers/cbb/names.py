@@ -66,13 +66,14 @@ def _preprocess(name: str, source: str | None) -> str:
     """Apply source-specific cleaning before alias lookup."""
     cleaned = name.strip()
     if source == "torvik":
-        if cleaned.endswith("(H)"):
-            cleaned = cleaned[:-3].strip()
         tokens = cleaned.split()
         if tokens and tokens[0].isdigit():
             tokens = tokens[1:]          # drop leading rank number
         if tokens and tokens[-1].upper() in CONFERENCES:
             tokens = tokens[:-1]         # drop trailing conference token
+        # Strip Torvik home-game marker: appended to team name token e.g. "New Mexico(H)"
+        if tokens and tokens[-1].endswith("(H)"):
+            tokens[-1] = tokens[-1][:-3].strip()
         cleaned = " ".join(tokens)
     elif source == "evanmiya":
         cleaned = cleaned.split("(")[0].strip()

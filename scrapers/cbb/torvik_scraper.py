@@ -44,11 +44,18 @@ class NumericParser:
 
     @staticmethod
     def to_int(val: Any) -> Optional[int]:
-        """Coerce to int; return None on any failure (never raises)."""
+        """
+        Coerce to int; return None on any failure (never raises).
+        Rejects float strings like "127.7" — use to_float for those.
+        Handles comma-separated integers like "1,000".
+        """
         try:
-            # Strip everything after first non-numeric char (handles "33-3", "1 seed ✅")
-            cleaned = re.match(r"^-?\d+", str(val).strip())
-            return int(cleaned.group()) if cleaned else None
+            s = str(val).strip().replace(",", "")
+            # Reject if a decimal point is present — this is a float, not an int
+            if "." in s:
+                return None
+            matched = re.match(r"^-?\d+", s)
+            return int(matched.group()) if matched else None
         except (ValueError, TypeError, AttributeError):
             return None
 
