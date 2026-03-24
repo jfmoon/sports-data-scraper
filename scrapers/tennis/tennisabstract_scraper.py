@@ -44,11 +44,17 @@ def fetch_rankings(top_n: int = 100) -> list:
     print(f"\U0001f4cb Fetching live WTA rankings (top {top_n})...")
     try:
         from playwright.sync_api import sync_playwright
+        from playwright_stealth import Stealth
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                viewport={"width": 1280, "height": 800},
+            )
+            page = context.new_page()
+            Stealth().apply_stealth_sync(page)
             page.goto(url, wait_until="domcontentloaded", timeout=60000)
-            page.wait_for_selector("table", timeout=60000)
+            page.wait_for_selector("table", timeout=30000)
             players = page.evaluate("""(topN) => {
                 const tables = Array.from(document.querySelectorAll('table'));
                 let rankTable = null;
@@ -363,7 +369,7 @@ def fetch_player_page(slug: str, page=None) -> Optional[BeautifulSoup]:
         try:
             pw_page.goto(url, wait_until="domcontentloaded", timeout=30000)
             try:
-                pw_page.wait_for_function("document.querySelectorAll('table').length >= 5", timeout=15000)
+                pw_page.wait_for_selector("table", timeout=10000)
             except Exception:
                 pass
             html = pw_page.content()
@@ -725,53 +731,44 @@ def main():
     print(f"🎾 Scraping {len(players_to_scrape)} WTA players from Tennis Abstract...")
 
     # ── Browser session management ───────────────────────────────────────────
-    # Recycle the browser every RECYCLE_EVERY players to reset the Cloudflare
-    # session fingerprint. Without recycling, Cloudflare rate-limits the session
-    # mid-run and all subsequent players fail. Each new context gets a fresh
-    # stealth patch and a short pause to avoid triggering burst detection.
-    RECYCLE_EVERY = 20
+    # Cloudflare tracks session state at the context level — sharing any browser
+    # context across players causes blocks after the first successful load.
+    # Only a fully fresh browser per player reliably bypasses this.
+    # Tradeoff: ~15-20s per player, ~60-80 min for 250 players.
 
     from playwright.sync_api import sync_playwright
     from playwright_stealth import Stealth
 
-    def make_page(playwright_instance):
-        """Launch a fresh stealth browser context and return (browser, page)."""
-        browser = playwright_instance.chromium.launch(headless=True)
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            viewport={"width": 1280, "height": 800},
-        )
-        page = context.new_page()
-        Stealth().apply_stealth_sync(page)
-        return browser, page
-
-    with sync_playwright() as p:
-        browser, pw_page = make_page(p)
-
-        for i, player in enumerate(players_to_scrape):
-            # Recycle browser session periodically
-            if i > 0 and i % RECYCLE_EVERY == 0:
-                print(f"  ♻️  Recycling browser session after {i} players...")
-                browser.close()
-                time.sleep(random.uniform(3.0, 6.0))  # pause before fresh session
-                browser, pw_page = make_page(p)
-
+    def scrape_with_fresh_browser(player, debug):
+        """Launch a fully isolated browser, scrape one player, close immediately."""
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                viewport={"width": 1280, "height": 800},
+            )
+            page = context.new_page()
+            Stealth().apply_stealth_sync(page)
             try:
-                result = scrape_player(player, debug=debug, page=pw_page)
-                if result:
-                    results.append(result)
-                    print(f"  ✅ {player['name']}")
-                else:
-                    errors.append(player["name"])
-            except Exception as e:
-                print(f"  ❌ {player['name']}: {e}", file=sys.stderr)
+                return scrape_player(player, debug=debug, page=page)
+            finally:
+                browser.close()
+
+    for i, player in enumerate(players_to_scrape):
+        try:
+            result = scrape_with_fresh_browser(player, debug)
+            if result:
+                results.append(result)
+                print(f"  ✅ {player['name']}")
+            else:
                 errors.append(player["name"])
+        except Exception as e:
+            print(f"  ❌ {player['name']}: {e}", file=sys.stderr)
+            errors.append(player["name"])
 
-            # Polite delay between requests
-            if i < len(players_to_scrape) - 1:
-                time.sleep(random.uniform(1.0, 2.5))
-
-        browser.close()
+        # Polite delay between requests
+        if i < len(players_to_scrape) - 1:
+            time.sleep(random.uniform(2.0, 4.0))
 
     # ── Write output — framework wrapper handles GCS/storage ─────────────────
     output = {
