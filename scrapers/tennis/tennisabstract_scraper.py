@@ -368,8 +368,15 @@ def fetch_player_page(slug: str, page=None) -> Optional[BeautifulSoup]:
     def _fetch_with_page(pw_page) -> Optional[BeautifulSoup]:
         try:
             pw_page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            # Most players: tables baked into HTML. Some players (e.g. MccartneyKessler)
+            # have data loaded from an external jsfrags/*.js file — wait for #main to
+            # be populated by that script before reading content.
             try:
-                pw_page.wait_for_selector("table", timeout=10000)
+                pw_page.wait_for_function(
+                    "document.querySelectorAll('table').length >= 5 || "
+                    "(document.getElementById('main') && document.getElementById('main').innerHTML.length > 100)",
+                    timeout=15000
+                )
             except Exception:
                 pass
             html = pw_page.content()
