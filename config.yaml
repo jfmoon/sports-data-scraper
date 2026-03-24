@@ -35,7 +35,7 @@ scrapers:
 
   evanmiya:
     name: evanmiya
-    enabled: false
+    enabled: true
     sport: cbb
     bucket: sports-data-scraper-491116
     gcs_object: cbb/evanmiya.json

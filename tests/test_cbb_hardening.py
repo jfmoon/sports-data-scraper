@@ -256,9 +256,14 @@ class TestTorvikWrapperValidate:
             },
         }
 
-    def _validate(self, data: dict) -> bool:
+    def _validate(self, data) -> bool:
         from scrapers.cbb.torvik import TorvikScraper
-        return TorvikScraper.validate(None, data)
+        flat = TorvikScraper.parse(None, data) if isinstance(data, dict) else data
+        try:
+            TorvikScraper.validate(None, flat)
+            return True
+        except (ValueError, Exception):
+            return False
 
     def test_validate_passes_with_sufficient_teams(self):
         assert self._validate(self._make_data(362)) is True
