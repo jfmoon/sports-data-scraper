@@ -349,316 +349,45 @@ def fetch_player_page(slug: str) -> Optional[BeautifulSoup]:
         if resp.status_code == 200:
             soup = BeautifulSoup(resp.text, "html.parser")
             # Verify we got a real player page — check for at least one data table
-            if soup.find("table"):
+            if len(soup.find_all("table")) >= 5:
                 return soup
-        print(f"  ⚠️  curl_cffi: no table data for {slug} (status {resp.status_code}), trying Playwright")
+        print(f"  ⚠️  curl_cffi: insufficient table data for {slug} (status {resp.status_code}), trying Playwright")
     except Exception as e:
         print(f"  ⚠️  curl_cffi failed for {slug}: {e}", file=sys.stderr)
 
-    # ── Fallback: Playwright (only if curl_cffi gets no tables) ──────────────
+    # ── Fallback: Playwright + stealth (bypasses Cloudflare headless detection) ─
     try:
         from playwright.sync_api import sync_playwright
+        from playwright_stealth import Stealth
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            page.goto(url, wait_until="networkidle", timeout=30000)
+            context = browser.new_context(
+                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                viewport={"width": 1280, "height": 800},
+            )
+            page = context.new_page()
+            Stealth().apply_stealth_sync(page)
+            page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            try:
+                page.wait_for_function("document.querySelectorAll('table').length >= 5", timeout=15000)
+            except Exception:
+                pass
             html = page.content()
             browser.close()
         soup = BeautifulSoup(html, "html.parser")
-        if soup.find("table"):
+        if len(soup.find_all("table")) >= 5:
             return soup
-        print(f"  ⚠️  Playwright: still no table data for {slug}")
+        print(f"  ⚠️  Playwright+stealth: still insufficient table data for {slug}")
     except Exception as e:
         print(f"  ❌ Playwright fallback failed for {slug}: {e}", file=sys.stderr)
 
     return None
 
 
-# ── Normalization ranges derived from WTA career stat distributions ───────────
-# Ranges represent realistic min/max across WTA top 100
-# Sources: Tennis Abstract career aggregates across known players
-
-NORM = {
-    # ── Serve Effectiveness ───────────────────────────────────────────────────
-    # WTA ace rates are much lower than ATP; Kvitova/Rybakina top out ~8-9%
-    "A_pct":    dict(lo=1.5,  hi=7.0,  invert=False),  # Ace %
-    "DF_pct":   dict(lo=2.0,  hi=6.5,  invert=True),   # DF % (lower = better)
-    "hld_pct":  dict(lo=60.0, hi=85.0, invert=False),  # Hold %
-    "first_in": dict(lo=57.0, hi=68.0, invert=False),  # 1st serve in %
-    "first_w":  dict(lo=61.0, hi=74.0, invert=False),  # 1st serve win %
-    "second_w": dict(lo=44.0, hi=57.0, invert=False),  # 2nd serve win %
-    "unret":    dict(lo=16.0, hi=34.0, invert=False),  # Unreturnable serve %
-
-    # ── Return / Receiving ────────────────────────────────────────────────────
-    # WTA break % ranges from ~30% (weak returner) to ~50% (elite returner)
-    "brk_pct":  dict(lo=28.0, hi=50.0, invert=False),  # Break %
-    "rip_w":    dict(lo=47.0, hi=63.0, invert=False),  # Return in-play win %
-    "rpw":      dict(lo=36.0, hi=52.0, invert=False),  # Return points won %
-
-    # ── Aggression / Power ────────────────────────────────────────────────────
-    # WTA winner rates: average ~15%, elite power hitters ~22-24%
-    "wnr_pt":   dict(lo=12.0, hi=24.0, invert=False),  # Winners per point %
-    "fh_wnr":   dict(lo=6.0,  hi=15.0, invert=False),  # FH winners per point %
-    "bh_wnr":   dict(lo=3.0,  hi=11.0, invert=False),  # BH winners per point %
-    "rally_agg":dict(lo=25.0, hi=80.0, invert=False),  # RallyAgg (0-100 scale)
-    "short_w":  dict(lo=47.0, hi=60.0, invert=False),  # 1-3 shot rally win %
-
-    # ── Consistency ───────────────────────────────────────────────────────────
-    # WTA UFE/Pt ranges: 14% (elite consistent) to 26% (error-prone)
-    "ufe_pt":   dict(lo=13.0, hi=26.0, invert=True),   # UFEs per point %
-    "vs_ufe":   dict(lo=13.0, hi=26.0, invert=True),   # Opponent UFEs (lower = grinder effect)
-
-    # ── Movement / Defense ────────────────────────────────────────────────────
-    # Long rally win %: <50% = struggles in rallies, >62% = dominant (Swiatek ~59%)
-    "long_w":   dict(lo=48.0, hi=64.0, invert=False),  # 10+ shot rally win %
-    "rlen":     dict(lo=3.2,  hi=5.8,  invert=False),  # Avg rally length
-
-    # ── Net Play ──────────────────────────────────────────────────────────────
-    "snv_freq": dict(lo=0.0,  hi=6.0,  invert=False),  # S&V frequency %
-    "net_freq": dict(lo=2.0,  hi=20.0, invert=False),  # Net approach frequency %
-    "net_w":    dict(lo=52.0, hi=80.0, invert=False),  # Net win %
-
-    # ── Spin / Topspin ────────────────────────────────────────────────────────
-    # Low BH slice % = topspin backhand; Swiatek ~5%, Jabeur ~35%
-    "bh_slice": dict(lo=3.0,  hi=30.0, invert=True),   # BH slice % (lower = topspin)
-    "slice_ret":dict(lo=3.0,  hi=22.0, invert=False),  # Return slice % (higher = slice tendency)
-    "fhp100":   dict(lo=5.0,  hi=15.0, invert=False),  # FH patterns per 100 pts
-
-    # ── Return game skill ─────────────────────────────────────────────────────
-    "rip_pct":  dict(lo=58.0, hi=80.0, invert=False),  # Return in-play %
-    "ret_wnr":  dict(lo=2.0,  hi=12.0, invert=False),  # Return winner %
-
-    # ── Mental / Clutch ───────────────────────────────────────────────────────
-    "bp_saved": dict(lo=50.0, hi=66.0, invert=False),  # BP Save %
-    "gp_conv":  dict(lo=56.0, hi=70.0, invert=False),  # Game point conversion %
-
-    # ── Variety / Drop shot ───────────────────────────────────────────────────
-    "drop_freq":dict(lo=0.0,  hi=4.0,  invert=False),  # Drop shot frequency %
-    "ret_agg":  dict(lo=25.0, hi=75.0, invert=False),  # ReturnAgg (0-100 scale)
-}
-
-
-def normalize_stat(key: str, raw_val: Optional[float]) -> Optional[float]:
-    if raw_val is None or key not in NORM:
-        return None
-    p = NORM[key]
-    return normalize(raw_val, p["lo"], p["hi"], p.get("invert", False))
-
-
-def safe_avg(*scores: Optional[float]) -> Optional[float]:
-    valid = [s for s in scores if s is not None]
-    return round(sum(valid) / len(valid), 1) if valid else None
-
-
-def score_or_default(score: Optional[float], default: float = 5.0) -> float:
-    return score if score is not None else default
-
-
-# ── Main scoring function ─────────────────────────────────────────────────────
-
-def compute_ratings(tables: list) -> dict:
-    """
-    Extract career stats from the verified table indices and compute
-    1–10 attribute scores for each of the 12 WTA Style Classifier dimensions.
-
-    Table index mapping (verified against actual page HTML):
-      9  → Tour-Level Seasons career
-      16 → Winners & Errors career
-      18 → Key Points career
-      21 → Charting: Serve career
-      22 → Charting: Return career
-      23 → Charting: Rally career
-      24 → Charting: Tactics career
-    """
-    seasons  = get_table_career_row(tables, "Hld%", "Brk%", "A%")
-    we       = get_table_career_row(tables, "Wnr/Pt", "UFE/Pt", "FH Wnr/Pt")
-    keypts   = get_table_career_row(tables, "BP Saved", "GP Conv")
-    ch_serve = get_table_career_row(tables, "Unret%", "<=3 W%")
-    ch_ret   = get_table_career_row(tables, "RiP%", "RetWnr%", "Slice%")
-    ch_rally = get_table_career_row(tables, "RallyLen", "1-3 W%", "BH Slice%")
-    ch_tact  = get_table_career_row(tables, "SnV Freq", "Net Freq", "RallyAgg")
-
-    # ── Raw stats ────────────────────────────────────────────────────────────
-    # Seasons table
-    hld    = pct(seasons.get("Hld%"))
-    brk    = pct(seasons.get("Brk%"))
-    ace    = pct(seasons.get("A%"))
-    df     = pct(seasons.get("DF%"))
-    f_in   = pct(seasons.get("1stIn"))
-    f_w    = pct(seasons.get("1st%"))
-    s_w    = pct(seasons.get("2nd%"))
-    rpw    = pct(seasons.get("RPW"))
-
-    # Winners & Errors
-    wnr_pt  = pct(we.get("Wnr/Pt"))
-    ufe_pt  = pct(we.get("UFE/Pt"))
-    fh_wnr  = pct(we.get("FH Wnr/Pt"))
-    bh_wnr  = pct(we.get("BH Wnr/Pt"))
-    vs_ufe  = pct(we.get("vs UFE/Pt"))
-
-    # Key Points
-    bp_saved = pct(keypts.get("BP Saved"))
-    gp_conv  = pct(keypts.get("GP Conv"))
-
-    # Charting: Serve
-    unret  = pct(ch_serve.get("Unret%"))
-    lt3_w  = pct(ch_serve.get("<=3 W%"))   # short point win % serving
-    rip_w_s= pct(ch_serve.get("RiP W%"))   # return-in-play win % (serve perspective)
-
-    # Charting: Return
-    rip    = pct(ch_ret.get("RiP%"))
-    rip_w  = pct(ch_ret.get("RiP W%"))
-    ret_wnr= pct(ch_ret.get("RetWnr%"))
-    slice_r= pct(ch_ret.get("Slice%"))
-    fhbh_r = val(ch_ret.get("FH/BH"))      # FH/BH ratio on returns
-
-    # Charting: Rally
-    rlen   = val(ch_rally.get("RallyLen"))
-    s13    = pct(ch_rally.get("1-3 W%"))
-    s10p   = pct(ch_rally.get("10+ W%"))
-    bh_sl  = pct(ch_rally.get("BH Slice%"))
-    fhp100 = val(ch_rally.get("FHP/100"))
-    bhp100 = val(ch_rally.get("BHP/100"))
-
-    # Charting: Tactics
-    snv_f  = pct(ch_tact.get("SnV Freq"))
-    net_f  = pct(ch_tact.get("Net Freq"))
-    net_w  = pct(ch_tact.get("Net W%"))
-    drop_f = pct(ch_tact.get("Drop: Freq"))
-    r_agg  = val(ch_tact.get("RallyAgg"))
-    ret_agg= val(ch_tact.get("ReturnAgg"))
-
-    # ── Attribute computation ─────────────────────────────────────────────────
-
-    # 1. FOREHAND POWER: FH winners, short rally win %, RallyAgg
-    forehand = safe_avg(
-        normalize_stat("fh_wnr",   fh_wnr),
-        normalize_stat("short_w",  s13),
-        normalize_stat("rally_agg",r_agg),
-        normalize_stat("wnr_pt",   wnr_pt),
-    )
-
-    # 2. BACKHAND QUALITY: BH winners, BH topspin (low slice = topspin), BH/FH ratio
-    bh_topspin = normalize_stat("bh_slice", bh_sl)  # low slice → high topspin
-    backhand = safe_avg(
-        normalize_stat("bh_wnr", bh_wnr),
-        bh_topspin,
-    )
-
-    # 3. SERVE EFFECTIVENESS: Ace%, Hold%, 1st serve %, 1st/2nd win %, Unret%
-    serve = safe_avg(
-        normalize_stat("A_pct",    ace),
-        normalize_stat("DF_pct",   df),
-        normalize_stat("hld_pct",  hld),
-        normalize_stat("first_in", f_in),
-        normalize_stat("first_w",  f_w),
-        normalize_stat("second_w", s_w),
-        normalize_stat("unret",    unret),
-    )
-
-    # 4. NET PLAY: S&V freq, net freq, net win %, drop shot freq
-    net_play = safe_avg(
-        normalize_stat("snv_freq", snv_f),
-        normalize_stat("net_freq", net_f),
-        normalize_stat("net_w",    net_w),
-        normalize_stat("drop_freq",drop_f),
-    )
-
-    # 5. MOVEMENT / DEFENSE: Long rally win %, RPW, return RiP%, break %
-    # Note: rally length (rlen) is NOT used here — short rallies indicate aggression,
-    # not poor movement. Long rally win % and RPW are the real movement signals.
-    movement = safe_avg(
-        normalize_stat("long_w",  s10p),   # wins long exchanges
-        normalize_stat("rpw",     rpw),    # overall return point efficiency
-        normalize_stat("rip_pct", rip),    # gets return in play (court coverage)
-        normalize_stat("brk_pct", brk),    # breaks down opponents (endurance on return)
-    )
-
-    # 6. SPIN HEAVINESS: BH topspin (inverted BH slice), FH patterns per 100
-    spin_heavy = safe_avg(
-        bh_topspin,
-        normalize_stat("fhp100", fhp100),
-    )
-
-    # 7. CONSISTENCY: low UFE/Pt, low opponent UFE (grinders force errors), DF%
-    consistency = safe_avg(
-        normalize_stat("ufe_pt",  ufe_pt),
-        normalize_stat("DF_pct",  df),
-        normalize_stat("vs_ufe",  vs_ufe),
-    )
-
-    # 8. AGGRESSION: Winners per point, RallyAgg, short rally %, ReturnAgg
-    aggression = safe_avg(
-        normalize_stat("wnr_pt",    wnr_pt),
-        normalize_stat("rally_agg", r_agg),
-        normalize_stat("short_w",   s13),
-        normalize_stat("ret_agg",   ret_agg),
-    )
-
-    # 9. MENTAL GAME: BP Save%, Game point conversion %
-    mental_game = safe_avg(
-        normalize_stat("bp_saved", bp_saved),
-        normalize_stat("gp_conv",  gp_conv),
-    )
-
-    # 10. RETURN GAME: Break%, RPW, RiP%, RiP win%, return winners
-    return_game = safe_avg(
-        normalize_stat("brk_pct",  brk),
-        normalize_stat("rpw",      rpw),
-        normalize_stat("rip_pct",  rip),
-        normalize_stat("rip_w",    rip_w),
-        normalize_stat("ret_wnr",  ret_wnr),
-    )
-
-    # 11. VARIETY: net freq, drop freq, return slice %, FH/BH ratio (diversity)
-    # High FH/BH ratio = FH-dominant (less variety in shot selection)
-    # We treat moderate ratio as higher variety
-    fhbh_variety = None
-    if fhbh_r is not None:
-        # Optimal variety around 1.0 ratio; very high or very low = one-dimensional
-        deviation = abs(fhbh_r - 1.0)
-        fhbh_variety = clamp(round(10 - deviation * 3, 1))
-
-    variety = safe_avg(
-        normalize_stat("net_freq",  net_f),
-        normalize_stat("drop_freq", drop_f),
-        normalize_stat("slice_ret", slice_r),
-        fhbh_variety,
-    )
-
-    # 12. RISK TAKING: High winners AND high UFEs = risk taker; inverted consistency
-    # W/UE ratio below 1.0 = net risk taker
-    risk = None
-    if wnr_pt is not None and ufe_pt is not None:
-        # Ratio <1 = more errors than winners (aggressive/risky), >1 = safer
-        ratio = wnr_pt / ufe_pt if ufe_pt > 0 else 1.0
-        # Higher risk = lower ratio AND higher absolute winner rate
-        risk_raw = wnr_pt * (1.0 / max(ratio, 0.5))
-        risk = normalize(risk_raw, lo=10.0, hi=28.0, invert=False)
-
-    risk_taking = safe_avg(
-        risk,
-        normalize_stat("wnr_pt", wnr_pt),
-    )
-
-    # Apply defaults for attributes with no charting data (some players have no MCP data)
-    def finalize(score: Optional[float]) -> int:
-        return int(round(score_or_default(score, 5.0)))
-
-    return {
-        "forehand":    finalize(forehand),
-        "backhand":    finalize(backhand),
-        "serve":       finalize(serve),
-        "netPlay":     finalize(net_play),
-        "movement":    finalize(movement),
-        "spinHeavy":   finalize(spin_heavy),
-        "consistency": finalize(consistency),
-        "aggression":  finalize(aggression),
-        "mentalGame":  finalize(mental_game),
-        "returnGame":  finalize(return_game),
-        "variety":     finalize(variety),
-        "riskTaking":  finalize(risk_taking),
-    }
+# ── Rating computation moved to sports-analysis: lib/logic/wta_mapper.py ──────
+# The NORM dict, normalize_stat(), safe_avg(), score_or_default(), and
+# compute_ratings() previously lived here. They are now in the analysis layer
+# where they belong (Transform, not Extract). This scraper emits raw_stats only.
 
 
 # ── Data availability metadata ────────────────────────────────────────────────
@@ -851,7 +580,61 @@ def scrape_player(player: dict, debug: bool = False) -> Optional[dict]:
                 headers = [c.get_text(strip=True) for c in first_row.find_all(["th", "td"])]
                 print(f"  Table {i:2d}: {' | '.join(headers[:8])}")
 
-    ratings = compute_ratings(tables)
+    # Extract raw stats from all table sources — no normalization, no scoring.
+    # Rating computation now lives in sports-analysis: lib/logic/wta_mapper.py.
+    seasons  = get_table_career_row(tables, "Hld%", "Brk%", "A%")
+    we       = get_table_career_row(tables, "Wnr/Pt", "UFE/Pt", "FH Wnr/Pt")
+    keypts   = get_table_career_row(tables, "BP Saved", "GP Conv")
+    ch_serve = get_table_career_row(tables, "Unret%", "<=3 W%")
+    ch_ret   = get_table_career_row(tables, "RiP%", "RetWnr%", "Slice%")
+    ch_rally = get_table_career_row(tables, "RallyLen", "1-3 W%", "BH Slice%")
+    ch_tact  = get_table_career_row(tables, "SnV Freq", "Net Freq", "RallyAgg")
+
+    raw_stats = {
+        # Seasons
+        "hld_pct":      pct(seasons.get("Hld%")),
+        "brk_pct":      pct(seasons.get("Brk%")),
+        "ace_pct":      pct(seasons.get("A%")),
+        "df_pct":       pct(seasons.get("DF%")),
+        "first_in":     pct(seasons.get("1stIn")),
+        "first_w":      pct(seasons.get("1st%")),
+        "second_w":     pct(seasons.get("2nd%")),
+        "rpw":          pct(seasons.get("RPW")),
+        # Winners & Errors
+        "wnr_pt":       pct(we.get("Wnr/Pt")),
+        "ufe_pt":       pct(we.get("UFE/Pt")),
+        "fh_wnr_pt":    pct(we.get("FH Wnr/Pt")),
+        "bh_wnr_pt":    pct(we.get("BH Wnr/Pt")),
+        "vs_ufe_pt":    pct(we.get("vs UFE/Pt")),
+        # Key Points
+        "bp_saved":     pct(keypts.get("BP Saved")),
+        "gp_conv":      pct(keypts.get("GP Conv")),
+        # Charting: Serve
+        "unret_pct":    pct(ch_serve.get("Unret%")),
+        "lt3_w":        pct(ch_serve.get("<=3 W%")),
+        "rip_w_serve":  pct(ch_serve.get("RiP W%")),
+        # Charting: Return
+        "rip_pct":      pct(ch_ret.get("RiP%")),
+        "rip_w":        pct(ch_ret.get("RiP W%")),
+        "ret_wnr_pct":  pct(ch_ret.get("RetWnr%")),
+        "slice_ret_pct":pct(ch_ret.get("Slice%")),
+        "fhbh_ratio":   val(ch_ret.get("FH/BH")),
+        # Charting: Rally
+        "rally_len":    val(ch_rally.get("RallyLen")),
+        "s13_w":        pct(ch_rally.get("1-3 W%")),
+        "s10p_w":       pct(ch_rally.get("10+ W%")),
+        "bh_slice_pct": pct(ch_rally.get("BH Slice%")),
+        "fhp100":       val(ch_rally.get("FHP/100")),
+        "bhp100":       val(ch_rally.get("BHP/100")),
+        # Charting: Tactics
+        "snv_freq":     pct(ch_tact.get("SnV Freq")),
+        "net_freq":     pct(ch_tact.get("Net Freq")),
+        "net_w":        pct(ch_tact.get("Net W%")),
+        "drop_freq":    pct(ch_tact.get("Drop: Freq")),
+        "rally_agg":    val(ch_tact.get("RallyAgg")),
+        "return_agg":   val(ch_tact.get("ReturnAgg")),
+    }
+
     availability = check_charting_availability(tables)
     recent_matches = parse_recent_matches(soup, slug, top_n=5)
     elo = parse_elo(soup)
@@ -861,21 +644,23 @@ def scrape_player(player: dict, debug: bool = False) -> Optional[dict]:
         for m in recent_matches:
             print(f"    {m['result']} {m['date']} {m['tournament']} {m['round']} vs {m['opponent']} {m['score']}")
         print(f"  DEBUG: Elo ratings: {elo}")
+        populated = {k: v for k, v in raw_stats.items() if v is not None}
+        print(f"  DEBUG: raw_stats populated: {len(populated)}/{len(raw_stats)} fields")
 
     # Derive nationality emoji from country code
     country = player.get("country", "")
     emoji = country_to_flag(country)
 
     return {
-        "name":           name,
-        "slug":           slug,
-        "country":        country,
-        "emoji":          emoji,
-        "rank":           player["rank"],
-        "lastUpdated":    datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-        "ratings":        ratings,
-        "elo":            elo,
-        "recentMatches":  recent_matches,
+        "name":             name,
+        "slug":             slug,
+        "country":          country,
+        "emoji":            emoji,
+        "rank":             player["rank"],
+        "lastUpdated":      datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "raw_stats":        raw_stats,
+        "elo":              elo,
+        "recentMatches":    recent_matches,
         "dataAvailability": availability,
     }
 
