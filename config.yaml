@@ -1,8 +1,14 @@
 groups:
-  cbb:    [espn, action_network, kenpom, evanmiya, torvik]
-  tennis: [sofascore, the_odds_api, tennisabstract]
+  cbb:         [espn, action_network, kenpom, evanmiya, torvik]
+  tennis:      [sofascore, the_odds_api, tennisabstract]
+  sports_odds: [nba_odds, mlb_odds, nhl_odds, nfl_odds]
 
 scrapers:
+
+  # ---------------------------------------------------------------------------
+  # CBB
+  # ---------------------------------------------------------------------------
+
   espn:
     name: espn
     enabled: true
@@ -42,6 +48,10 @@ scrapers:
     gcs_object: cbb/torvik_team.json
     split_presets: [full_season, last_10]
     year: 2026
+
+  # ---------------------------------------------------------------------------
+  # Tennis
+  # ---------------------------------------------------------------------------
 
   sofascore:
     name: sofascore
@@ -95,7 +105,43 @@ scrapers:
       - {name: "Wakana Sonobe",        slug: "WakanaSonobe"}
     # Players with sparse/inactive TA pages — failures logged as warnings not errors
     optional_players:
-      - {name: "McCartney Kessler", slug: "McCartneKessler"}      
+      - {name: "McCartney Kessler", slug: "McCartneKessler"}
       - {name: "Danielle Collins",  slug: "DanielleCollins"}
       - {name: "Sloane Stephens",   slug: "SloaneStephens"}
       - {name: "Sofia Kenin",       slug: "SofiaKenin"}
+
+  # ---------------------------------------------------------------------------
+  # Sports odds (NBA, MLB, NHL, NFL) via Action Network
+  # ---------------------------------------------------------------------------
+
+  nba_odds:
+    name: nba_odds
+    enabled: true
+    sport: nba
+    bucket: sports-data-scraper-491116
+    gcs_object: nba/odds.json
+    primary_book_id: 15
+
+  mlb_odds:
+    name: mlb_odds
+    enabled: true
+    sport: mlb
+    bucket: sports-data-scraper-491116
+    gcs_object: mlb/odds.json
+    primary_book_id: 15
+
+  nhl_odds:
+    name: nhl_odds
+    enabled: true
+    sport: nhl
+    bucket: sports-data-scraper-491116
+    gcs_object: nhl/odds.json
+    primary_book_id: 15
+
+  nfl_odds:
+    name: nfl_odds
+    enabled: true
+    sport: nfl
+    bucket: sports-data-scraper-491116
+    gcs_object: nfl/odds.json
+    primary_book_id: 15
