@@ -1,22 +1,33 @@
 """
 WTA Tennis Abstract Scraper
-Scrapes player stats from tennisabstract.com and normalizes to 1-10 attribute scores.
+Scrapes player stats from tennisabstract.com and emits raw float stats for downstream analysis.
 
-Data sources verified by inspecting actual page HTML:
-- Table 9:  Tour-Level Seasons (Career row) → Hld%, Brk%, A%, DF%, 1stIn, 1st%, 2nd%, SPW, RPW
-- Table 16: Winners & Errors (Career row)   → Wnr/Pt, UFE/Pt, FH Wnr/Pt, BH Wnr/Pt, vs UFE/Pt
-- Table 18: Key Points (Career row)         → BP Saved%, GP Conv%
-- Table 21: Charting Serve (Career row)     → Unret%, <=3 W%, RiP W%
-- Table 22: Charting Return (Career row)    → RiP%, RiP W%, Slice%, FH/BH ratio
-- Table 23: Charting Rally (Career row)     → RallyLen, 1-3 W%, 10+ W%, BH Slice%, FHP/100, BHP/100
-- Table 24: Charting Tactics (Career row)   → SnV Freq, Net Freq, Net W%, Drop Freq, RallyAgg, ReturnAgg
-- Recent Results table                      → Last 5 matches (date, tournament, surface, round, opponent, score, W/L)
+Fetch method: Playwright + playwright-stealth (required — Cloudflare blocks headless Playwright
+and curl_cffi without stealth patches).
 
-Output: JSON with 13 attributes rated 1-10, last 5 match results, suitable for the WTA Style Classifier.
+Data sources (7 HTML tables, identified by column headers):
+- Tour-Level Seasons  → Hld%, Brk%, A%, DF%, 1stIn, 1st%, 2nd%, RPW
+- Winners & Errors    → Wnr/Pt, UFE/Pt, FH Wnr/Pt, BH Wnr/Pt, vs UFE/Pt
+- Key Points          → BP Saved%, GP Conv%
+- Charting: Serve     → Unret%, <=3 W%, RiP W%
+- Charting: Return    → RiP%, RiP W%, RetWnr%, Slice%, FH/BH ratio
+- Charting: Rally     → RallyLen, 1-3 W%, 10+ W%, BH Slice%, FHP/100, BHP/100
+- Charting: Tactics   → SnV Freq, Net Freq, Net W%, Drop Freq, RallyAgg, ReturnAgg
+- Recent Results      → Last 5 matches (date, tournament, opponent, score, W/L)
+
+Output: raw_stats dict with 35 float fields. Rating computation is handled by
+jfmoon/sports-analysis lib/logic/wta_mapper.py (Transform layer).
 """
 
-from curl_cffi import requests as cf_requests
-from bs4 import BeautifulSoup
+try:
+    from bs4 import BeautifulSoup
+    from playwright.sync_api import sync_playwright
+    from playwright_stealth import Stealth
+except ImportError:
+    print("❌ Missing dependencies. Install with: pip install playwright playwright-stealth beautifulsoup4")
+    print("Then run: playwright install chromium")
+    import sys; sys.exit(1)
+
 import json
 import time
 import random
@@ -335,27 +346,40 @@ def get_table_career_row(tables: list, *required_columns: str) -> dict:
     return dict(zip(headers, values))
 
 
-def fetch_player_page(slug: str) -> Optional[BeautifulSoup]:
+def fetch_player_page(slug: str, page=None) -> Optional[BeautifulSoup]:
     """
-    Fetch a Tennis Abstract player page.
-    curl_cffi first (fast, low memory) — Playwright fallback only if blocked.
-    Player pages are static HTML so curl_cffi handles them 95%+ of the time.
+    Fetch a Tennis Abstract player page using Playwright + stealth.
+
+    curl_cffi is no longer used — Cloudflare blocks it consistently.
+    Stealth Playwright is the only reliable fetch method.
+
+    Pass a persistent Playwright page object to reuse across multiple players
+    (avoids launching a new browser per player). If None, creates a one-shot
+    browser for single-player mode.
     """
     url = f"https://www.tennisabstract.com/cgi-bin/wplayer.cgi?p={slug}"
 
-    # ── Primary: curl_cffi (Chrome impersonation, no browser overhead) ────────
-    try:
-        resp = cf_requests.get(url, impersonate="chrome120", timeout=15)
-        if resp.status_code == 200:
-            soup = BeautifulSoup(resp.text, "html.parser")
-            # Verify we got a real player page — check for at least one data table
+    def _fetch_with_page(pw_page) -> Optional[BeautifulSoup]:
+        try:
+            pw_page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            try:
+                pw_page.wait_for_function("document.querySelectorAll('table').length >= 5", timeout=15000)
+            except Exception:
+                pass
+            html = pw_page.content()
+            soup = BeautifulSoup(html, "html.parser")
             if len(soup.find_all("table")) >= 5:
                 return soup
-        print(f"  ⚠️  curl_cffi: insufficient table data for {slug} (status {resp.status_code}), trying Playwright")
-    except Exception as e:
-        print(f"  ⚠️  curl_cffi failed for {slug}: {e}", file=sys.stderr)
+            print(f"  ⚠️  Playwright+stealth: insufficient table data for {slug}")
+            return None
+        except Exception as e:
+            print(f"  ❌ Playwright fetch failed for {slug}: {e}", file=sys.stderr)
+            return None
 
-    # ── Fallback: Playwright + stealth (bypasses Cloudflare headless detection) ─
+    if page is not None:
+        return _fetch_with_page(page)
+
+    # Single-player mode — create a one-shot browser
     try:
         from playwright.sync_api import sync_playwright
         from playwright_stealth import Stealth
@@ -365,23 +389,14 @@ def fetch_player_page(slug: str) -> Optional[BeautifulSoup]:
                 user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 viewport={"width": 1280, "height": 800},
             )
-            page = context.new_page()
-            Stealth().apply_stealth_sync(page)
-            page.goto(url, wait_until="domcontentloaded", timeout=30000)
-            try:
-                page.wait_for_function("document.querySelectorAll('table').length >= 5", timeout=15000)
-            except Exception:
-                pass
-            html = page.content()
+            pw_page = context.new_page()
+            Stealth().apply_stealth_sync(pw_page)
+            result = _fetch_with_page(pw_page)
             browser.close()
-        soup = BeautifulSoup(html, "html.parser")
-        if len(soup.find_all("table")) >= 5:
-            return soup
-        print(f"  ⚠️  Playwright+stealth: still insufficient table data for {slug}")
+        return result
     except Exception as e:
-        print(f"  ❌ Playwright fallback failed for {slug}: {e}", file=sys.stderr)
-
-    return None
+        print(f"  ❌ Playwright browser launch failed for {slug}: {e}", file=sys.stderr)
+        return None
 
 
 # ── Rating computation moved to sports-analysis: lib/logic/wta_mapper.py ──────
@@ -518,22 +533,22 @@ def parse_recent_matches(soup: BeautifulSoup, player_slug: str, top_n: int = 5) 
 
             # Parse win/loss and opponent from description
             # Pattern: "PlayerA d. PlayerB" — the player who appears before " d. " won
+            # Use player surname for matching — more robust than slug fragment
             result = "W"
             opponent = ""
             if " d. " in desc:
                 parts = desc.split(" d. ")
-                # Crude check: if slug fragment appears in first part, player won
-                # slug like "ArynaSabalenka" → check for "Sabalenka" in first part
-                slug_fragment = player_slug[-8:].lower()  # last 8 chars of slug (e.g. "abalenka")
+                player_surname = player_slug.rstrip("0123456789")  # strip trailing digits (e.g. "Gasanova2")
+                # Extract surname: split CamelCase slug and take last word
+                # "ArynaSabalenka" -> ["Aryna", "Sabalenka"] -> "sabalenka"
+                words = re.findall(r"[A-Z][a-z]*", player_surname)
+                surname = words[-1].lower() if words else player_surname.lower()
                 winner_part = parts[0].lower()
-                result = "W" if slug_fragment in winner_part else "L"
-                # Opponent is the OTHER part — strip seeding brackets like "(3)"
+                result = "W" if surname in winner_part else "L"
                 opponent_raw = parts[1] if result == "W" else parts[0]
-                # Remove seeding e.g. "(3)" from start, remove country code "[KAZ]" from end
-                opponent = re.sub(r"^\(\S+\)", "", opponent_raw).strip()
+                # Remove seeding e.g. "(3)" or "(Q)" from start, country code "[KAZ]" from end
+                opponent = re.sub(r"^\([^)]*\)\s*", "", opponent_raw).strip()
                 opponent = re.sub(r"\s*\[[A-Z]{3}\]\s*$", "", opponent).strip()
-                # Also strip any remaining leading/trailing seeding
-                opponent = re.sub(r"^\(Q\)\s*", "", opponent).strip()
             else:
                 # Walkover or retired — use full desc as opponent
                 opponent = desc
@@ -559,12 +574,12 @@ def parse_recent_matches(soup: BeautifulSoup, player_slug: str, top_n: int = 5) 
 
 # ── Per-player scrape ─────────────────────────────────────────────────────────
 
-def scrape_player(player: dict, debug: bool = False) -> Optional[dict]:
+def scrape_player(player: dict, debug: bool = False, page=None) -> Optional[dict]:
     slug = player["slug"]
     name = player["name"]
     print(f"  Scraping {name} ({slug})...")
 
-    soup = fetch_player_page(slug)
+    soup = fetch_player_page(slug, page=page)
     if soup is None:
         return None
 
@@ -709,21 +724,38 @@ def main():
 
     print(f"🎾 Scraping {len(players_to_scrape)} WTA players from Tennis Abstract...")
 
-    for i, player in enumerate(players_to_scrape):
-        try:
-            result = scrape_player(player, debug=debug)
-            if result:
-                results.append(result)
-                print(f"  ✅ {player['name']}")
-            else:
-                errors.append(player["name"])
-        except Exception as e:
-            print(f"  ❌ {player['name']}: {e}", file=sys.stderr)
-            errors.append(player["name"])
+    # ── Single persistent browser for the full run ────────────────────────────
+    # Avoids launching/closing a browser per player (250x overhead).
+    # Stealth is applied once to the context and persists across all page loads.
+    from playwright.sync_api import sync_playwright
+    from playwright_stealth import Stealth
 
-        # Polite delay between requests
-        if i < len(players_to_scrape) - 1:
-            time.sleep(random.uniform(1.0, 2.5))
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            viewport={"width": 1280, "height": 800},
+        )
+        pw_page = context.new_page()
+        Stealth().apply_stealth_sync(pw_page)
+
+        for i, player in enumerate(players_to_scrape):
+            try:
+                result = scrape_player(player, debug=debug, page=pw_page)
+                if result:
+                    results.append(result)
+                    print(f"  ✅ {player['name']}")
+                else:
+                    errors.append(player["name"])
+            except Exception as e:
+                print(f"  ❌ {player['name']}: {e}", file=sys.stderr)
+                errors.append(player["name"])
+
+            # Polite delay between requests
+            if i < len(players_to_scrape) - 1:
+                time.sleep(random.uniform(1.0, 2.5))
+
+        browser.close()
 
     # ── Write output — framework wrapper handles GCS/storage ─────────────────
     output = {

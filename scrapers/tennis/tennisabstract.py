@@ -23,7 +23,7 @@ import sys
 from datetime import datetime, timezone
 from typing import Optional, List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from base.scraper import BaseScraper
 from base.storage import StorageManager
 
@@ -44,6 +44,21 @@ class EloRatings(BaseModel):
     cEloRank: Optional[int] = None
     gElo:     Optional[int] = None
     gEloRank: Optional[int] = None
+
+
+class PlayerRatings(BaseModel):
+    forehand:    int = Field(default=5, ge=1, le=10)
+    backhand:    int = Field(default=5, ge=1, le=10)
+    serve:       int = Field(default=5, ge=1, le=10)
+    netPlay:     int = Field(default=5, ge=1, le=10)
+    movement:    int = Field(default=5, ge=1, le=10)
+    spinHeavy:   int = Field(default=5, ge=1, le=10)
+    consistency: int = Field(default=5, ge=1, le=10)
+    aggression:  int = Field(default=5, ge=1, le=10)
+    mentalGame:  int = Field(default=5, ge=1, le=10)
+    returnGame:  int = Field(default=5, ge=1, le=10)
+    variety:     int = Field(default=5, ge=1, le=10)
+    riskTaking:  int = Field(default=5, ge=1, le=10)
 
 
 class RecentMatch(BaseModel):
@@ -70,13 +85,10 @@ class WtaPlayer(BaseModel):
     emoji:            str = ""
     rank:             Optional[int] = None
     lastUpdated:      str = ""
-    raw_stats:        Optional[dict] = None        # raw float stats from scraper
-    ratings:          Optional[dict] = None        # legacy field — present in pre-2026-03-24 GCS files only
+    ratings:          PlayerRatings = Field(default_factory=PlayerRatings)
     elo:              EloRatings = Field(default_factory=EloRatings)
     recentMatches:    List[RecentMatch] = Field(default_factory=list)
     dataAvailability: DataAvailability = Field(default_factory=DataAvailability)
-
-    model_config = {"extra": "allow"}  # absorb any future scraper fields gracefully
 
 
 # ── Scraper ───────────────────────────────────────────────────────────────────
@@ -164,6 +176,13 @@ class TennisAbstractScraper(BaseScraper):
             for player in extras:
                 out_path = f"{out_dir}/{label}_{player['slug']}_{ts_str}.json"
                 ok = self._call_scraper(player["slug"], 0, out_path)
+
+                # Retry once on failure — transient Cloudflare blocks often clear on second attempt
+                if not ok:
+                    print(f"  ↻  {player['name']} — retrying in 10s...")
+                    import time as _time; _time.sleep(10)
+                    ok = self._call_scraper(player["slug"], 0, out_path)
+
                 if ok:
                     with open(out_path) as f:
                         p_data = json.load(f)
@@ -174,13 +193,13 @@ class TennisAbstractScraper(BaseScraper):
                         print(f"  ✅ {player['name']}")
                         continue
 
-                # Failed
+                # Failed after retry
                 if is_optional:
                     soft_warns.append(player["name"])
-                    print(f"  ⚠️  {player['name']} — sparse/inactive, skipped")
+                    print(f"  ⚠️  {player['name']} — failed after retry, skipped")
                 else:
                     hard_errors.append(player["name"])
-                    print(f"  ❌ {player['name']} — hard error")
+                    print(f"  ❌ {player['name']} — failed after retry, hard error")
 
         if soft_warns:
             print(f"\n[TennisAbstract] Skipped: {', '.join(soft_warns)}")
