@@ -46,21 +46,6 @@ class EloRatings(BaseModel):
     gEloRank: Optional[int] = None
 
 
-class PlayerRatings(BaseModel):
-    forehand:    int = Field(default=5, ge=1, le=10)
-    backhand:    int = Field(default=5, ge=1, le=10)
-    serve:       int = Field(default=5, ge=1, le=10)
-    netPlay:     int = Field(default=5, ge=1, le=10)
-    movement:    int = Field(default=5, ge=1, le=10)
-    spinHeavy:   int = Field(default=5, ge=1, le=10)
-    consistency: int = Field(default=5, ge=1, le=10)
-    aggression:  int = Field(default=5, ge=1, le=10)
-    mentalGame:  int = Field(default=5, ge=1, le=10)
-    returnGame:  int = Field(default=5, ge=1, le=10)
-    variety:     int = Field(default=5, ge=1, le=10)
-    riskTaking:  int = Field(default=5, ge=1, le=10)
-
-
 class RecentMatch(BaseModel):
     date:       str = ""
     tournament: str = ""
@@ -85,10 +70,13 @@ class WtaPlayer(BaseModel):
     emoji:            str = ""
     rank:             Optional[int] = None
     lastUpdated:      str = ""
-    ratings:          PlayerRatings = Field(default_factory=PlayerRatings)
+    raw_stats:        Optional[dict] = None        # raw float stats from scraper
+    ratings:          Optional[dict] = None        # legacy: pre-2026-03-24 GCS files only
     elo:              EloRatings = Field(default_factory=EloRatings)
     recentMatches:    List[RecentMatch] = Field(default_factory=list)
     dataAvailability: DataAvailability = Field(default_factory=DataAvailability)
+
+    model_config = {"extra": "allow"}
 
 
 # ── Scraper ───────────────────────────────────────────────────────────────────
