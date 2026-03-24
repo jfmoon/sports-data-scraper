@@ -9,3 +9,12 @@ fanmatch_data.json
 debug_page.html
 *.egg-info/
 players.json
+data/evanmiya_auth_state.json
+data/evanmiya_dom_debug.html
+data/evanmiya_dom_inspect*
+data/evanmiya_probe*
+data/evanmiya_session*
+scrapers/cbb/evanmiya_anonymous_probe.py
+scrapers/cbb/evanmiya_dom_inspect.py
+scrapers/cbb/evanmiya_dom_test.py
+scrapers/cbb/evanmiya_session_test.py
