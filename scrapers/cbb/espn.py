@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from base.scraper import BaseScraper
 from base.models import CBBGame
 from base.storage import StorageManager
+from scrapers.cbb.names import to_canonical
 
 
 class ESPNScraper(BaseScraper):
@@ -32,10 +33,10 @@ class ESPNScraper(BaseScraper):
                     "date":      ev["date"][:10],
                     "state":     ev["status"]["type"]["state"],
                     "completed": ev["status"]["type"]["completed"],
-                    "t1_name":   self.resolver.resolve(t1["team"]["displayName"]),
+                    "t1_name":   to_canonical(self.resolver.resolve(t1["team"]["displayName"])),
                     "t1_score":  clean_score(t1.get("score")),
                     "t1_winner": t1.get("winner", False),
-                    "t2_name":   self.resolver.resolve(t2["team"]["displayName"]),
+                    "t2_name":   to_canonical(self.resolver.resolve(t2["team"]["displayName"])),
                     "t2_score":  clean_score(t2.get("score")),
                     "t2_winner": t2.get("winner", False),
                 })

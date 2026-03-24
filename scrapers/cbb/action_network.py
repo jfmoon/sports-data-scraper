@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from base.scraper import BaseScraper
 from base.models import OddsSnapshot
 from base.storage import StorageManager
+from scrapers.cbb.names import to_canonical
 
 
 class ActionNetworkScraper(BaseScraper):
@@ -36,7 +37,7 @@ class ActionNetworkScraper(BaseScraper):
             for team_type in ["away", "home"]:
                 tid    = away_id if team_type == "away" else home_id
                 t_raw  = next((t for t in g["teams"] if t["id"] == tid), {})
-                t_name = self.resolver.resolve(t_raw.get("full_name", ""))
+                t_name = to_canonical(self.resolver.resolve(t_raw.get("full_name", "")))
 
                 row = {
                     "team": t_name, "spread": "TBD", "moneyline": "",
