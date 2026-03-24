@@ -53,6 +53,13 @@ import sys
 from datetime import datetime, timedelta, timezone
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 from playwright_stealth import Stealth
+
+# Add repo root to sys.path so this script can import from scrapers.*
+# when called as a subprocess (working directory may not be the repo root)
+_repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
+
 from scrapers.cbb.names import to_canonical
 
 BASE_URL = "https://kenpom.com"
@@ -302,8 +309,21 @@ def scrape_team_page(page, team_slug: str, year: str = None, retries: int = 0) -
 
 # ── FanMatch scraper ──────────────────────────────────────────────────────────
 
-# Team name canonicalization is handled by scrapers/cbb/names.py.
-# to_canonical() is imported above and used in scrape_fanmatch().
+# KenPom abbreviates some team names differently from the app.
+# Translate FanMatch names → app names before returning.
+# Confirmed against live FanMatch pages 2026-03-19 through 2026-03-22.
+KENPOM_NAME_MAP = {
+    "Connecticut":   "UConn",          # KP uses full name, app uses UConn
+    "Iowa St.":      "Iowa State",     # KP abbreviates, app uses full
+    "Michigan St.":  "Michigan State", # KP abbreviates, app uses full
+    "Utah St.":      "Utah State",     # KP abbreviates, app uses full
+    "Miami FL":      "Miami (FL)",     # KP drops parens, app keeps them
+    # Add future round names here as needed
+}
+
+def _translate_name(name: str) -> str:
+    """Translate a KenPom team name to the app's canonical name."""
+    return KENPOM_NAME_MAP.get(name, name)
 
 
 def scrape_fanmatch(page, date_str: str = None) -> list:
@@ -312,7 +332,7 @@ def scrape_fanmatch(page, date_str: str = None) -> list:
     Returns list of game dicts (NCAA games only).
 
     date_str: "YYYY-MM-DD" or None for today's games.
-    Team names are canonicalized via scrapers/cbb/names.py to_canonical().
+    Team names are translated via KENPOM_NAME_MAP to match app canonical names.
 
     Game dict fields:
         game, team1, team2, rank1, rank2,
@@ -370,14 +390,14 @@ def scrape_fanmatch(page, date_str: str = None) -> list:
     ncaa = [g for g in games if g["is_ncaa"]]
     print(f"  Parsed {len(games)} total, {len(ncaa)} NCAA tournament games")
 
-    # Canonicalize team names via shared scrapers/cbb/names.py
+    # Translate team names to app canonical names
     for g in ncaa:
         for field in ("team1", "team2", "fav", "dog", "kp_winner"):
             if g[field]:
-                canonical = to_canonical(g[field])
-                if canonical != g[field]:
-                    print(f"  [to_canonical] '{g[field]}' → '{canonical}'")
-                g[field] = canonical
+                translated = _translate_name(g[field])
+                if translated != g[field]:
+                    print(f"  [translate] '{g[field]}' → '{translated}'")
+                g[field] = translated
 
     return ncaa
 
