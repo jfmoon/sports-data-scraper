@@ -1,18 +1,17 @@
 """
 Tennis Abstract scraper wrapper for the sports-data-scraper framework.
 
-Delegates all scraping to tennisabstract_scraper.py (Playwright + curl_cffi).
-
+Delegates all scraping to tennisabstract_scraper.py (Playwright + stealth).
 After the scrape completes it:
-  1. Uploads raw JSON  → GCS: raw/tennisabstract/{date}/players_{ts}.json
-  2. Writes parsed     → GCS: tennis/players.json
+  1. Uploads raw JSON → GCS: raw/tennisabstract/{date}/players_{ts}.json
+  2. Writes parsed    → GCS: tennis/players.json
 
 Config keys (in config.yaml under tennisabstract):
-  top: 250
-  slug: null              # single player slug for testing
-  priority_players:       # always scraped — failure = hard error
+  top:  250
+  slug: null  # single player slug for testing
+  priority_players:  # always scraped — failure = hard error
     - {name: "Emma Raducanu", slug: "EmmaRaducanu"}
-  optional_players:       # always attempted — failure = warning only
+  optional_players:  # always attempted — failure = warning only
     - {name: "Danielle Collins", slug: "DanielleCollins"}
 """
 
@@ -24,9 +23,9 @@ from datetime import datetime, timezone
 from typing import Optional, List
 
 from pydantic import BaseModel, Field
+
 from base.scraper import BaseScraper
 from base.storage import StorageManager
-
 
 TENNISABSTRACT_SCRAPER = os.path.join(
     os.path.dirname(__file__), "tennisabstract_scraper.py"
@@ -36,44 +35,44 @@ TENNISABSTRACT_SCRAPER = os.path.join(
 # ── Pydantic models matching actual tennisabstract_scraper.py output ──────────
 
 class EloRatings(BaseModel):
-    elo:      Optional[int] = None
-    eloRank:  Optional[int] = None
-    hElo:     Optional[int] = None
+    elo: Optional[int] = None
+    eloRank: Optional[int] = None
+    hElo: Optional[int] = None
     hEloRank: Optional[int] = None
-    cElo:     Optional[int] = None
+    cElo: Optional[int] = None
     cEloRank: Optional[int] = None
-    gElo:     Optional[int] = None
+    gElo: Optional[int] = None
     gEloRank: Optional[int] = None
 
 
 class RecentMatch(BaseModel):
-    date:       str = ""
+    date: str = ""
     tournament: str = ""
-    surface:    str = ""
-    round:      str = ""
-    opponent:   str = ""
-    score:      str = ""
-    result:     str = ""
+    surface: str = ""
+    round: str = ""
+    opponent: str = ""
+    score: str = ""
+    result: str = ""
 
 
 class DataAvailability(BaseModel):
-    hasChartingServe:   bool = False
-    hasChartingReturn:  bool = False
-    hasChartingRally:   bool = False
+    hasChartingServe: bool = False
+    hasChartingReturn: bool = False
+    hasChartingRally: bool = False
     hasChartingTactics: bool = False
 
 
 class WtaPlayer(BaseModel):
-    name:             str
-    slug:             str
-    country:          str = ""
-    emoji:            str = ""
-    rank:             Optional[int] = None
-    lastUpdated:      str = ""
-    raw_stats:        Optional[dict] = None        # raw float stats from scraper
-    ratings:          Optional[dict] = None        # legacy: pre-2026-03-24 GCS files only
-    elo:              EloRatings = Field(default_factory=EloRatings)
-    recentMatches:    List[RecentMatch] = Field(default_factory=list)
+    name: str
+    slug: str
+    country: str = ""
+    emoji: str = ""
+    rank: Optional[int] = None
+    lastUpdated: str = ""
+    raw_stats: Optional[dict] = None   # raw float stats from scraper
+    ratings: Optional[dict] = None    # legacy: pre-2026-03-24 GCS files only
+    elo: EloRatings = Field(default_factory=EloRatings)
+    recentMatches: List[RecentMatch] = Field(default_factory=list)
     dataAvailability: DataAvailability = Field(default_factory=DataAvailability)
 
     model_config = {"extra": "allow"}
@@ -92,39 +91,36 @@ class TennisAbstractScraper(BaseScraper):
         env = os.environ.copy()
         env.update({
             "OUTPUT_PATH": out_path,
-            "TOP_N":       str(top_n),
-            "GCS_BUCKET":  self.config.get("bucket", ""),
+            "TOP_N": str(top_n),
+            "GCS_BUCKET": self.config.get("bucket", ""),
         })
-        cmd     = [sys.executable, TENNISABSTRACT_SCRAPER]
+        cmd = [sys.executable, TENNISABSTRACT_SCRAPER]
         timeout = 120 if slug else 3600
         if slug:
             cmd.append(slug)
-
         try:
             subprocess.run(cmd, check=True, env=env, timeout=timeout)
             return os.path.exists(out_path) and os.path.getsize(out_path) > 0
         except subprocess.TimeoutExpired:
-            print(f"  [Timeout] {slug or f'top-{top_n}'} exceeded {timeout}s")
+            print(f" [Timeout] {slug or f'top-{top_n}'} exceeded {timeout}s")
             return False
         except subprocess.CalledProcessError as e:
-            print(f"  [Script Error] {slug or f'top-{top_n}'} exited {e.returncode}")
+            print(f" [Script Error] {slug or f'top-{top_n}'} exited {e.returncode}")
             return False
 
     def fetch(self):
-        top              = self.config.get("top", 250)
-        slug             = self.config.get("slug", None)
-        priority_players = self.config.get("priority_players", [])
-        optional_players = self.config.get("optional_players", [])
-        date_str         = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        ts_str           = datetime.now(timezone.utc).strftime("%H%M%S")
-        out_dir          = f"data/raw/tennisabstract/{date_str}"
+        top = self.config.get("top", 250)
+        slug = self.config.get("slug", None)
+        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        ts_str = datetime.now(timezone.utc).strftime("%H%M%S")
+        out_dir = f"data/raw/tennisabstract/{date_str}"
         os.makedirs(out_dir, exist_ok=True)
 
         all_players = []
         hard_errors = []
-        soft_warns  = []
+        soft_warns = []
 
-        # ── Single-player test mode ───────────────────────────────────────────
+        # ── Single-player test mode ─────────────────────────────────────────
         if slug:
             out_path = f"{out_dir}/players_{ts_str}.json"
             print(f"\n[TennisAbstract] Single player: {slug}")
@@ -135,7 +131,7 @@ class TennisAbstractScraper(BaseScraper):
             self._raw_path = out_path
             return {"path": out_path, "data": data}
 
-        # ── Step 1: top N by ranking ──────────────────────────────────────────
+        # ── Step 1: top N by ranking ────────────────────────────────────────
         ranked_path = f"{out_dir}/ranked_{ts_str}.json"
         print(f"\n[TennisAbstract] Scraping top {top} WTA players...")
         if self._call_scraper(None, top, ranked_path):
@@ -144,33 +140,27 @@ class TennisAbstractScraper(BaseScraper):
             all_players = ranked_data.get("players", [])
             hard_errors = ranked_data.get("errors", [])
         else:
-            print("  ❌ Critical: ranked list fetch failed")
-
+            print(" ❌ Critical: ranked list fetch failed")
         if not all_players:
-            print("  [CRITICAL] Ranked fetch returned 0 players — possible site outage or bot block.")
+            print(" [CRITICAL] Ranked fetch returned 0 players — possible site outage or bot block.")
 
         scraped_slugs = {p["slug"] for p in all_players}
 
-        # ── Step 2 & 3: priority then optional extras ─────────────────────────
-        for group, is_optional in [("priority_players", False),
-                                   ("optional_players",  True)]:
-            extras = [p for p in self.config.get(group, [])
-                      if p["slug"] not in scraped_slugs]
+        # ── Step 2 & 3: priority then optional extras ───────────────────────
+        for group, is_optional in [("priority_players", False), ("optional_players", True)]:
+            extras = [p for p in self.config.get(group, []) if p["slug"] not in scraped_slugs]
             if not extras:
                 continue
             label = "optional" if is_optional else "priority"
             print(f"\n[TennisAbstract] {len(extras)} {label} players outside top {top}...")
-
             for player in extras:
                 out_path = f"{out_dir}/{label}_{player['slug']}_{ts_str}.json"
                 ok = self._call_scraper(player["slug"], 0, out_path)
-
-                # Retry once on failure — transient Cloudflare blocks often clear on second attempt
                 if not ok:
-                    print(f"  ↻  {player['name']} — retrying in 10s...")
-                    import time as _time; _time.sleep(10)
+                    print(f" ↻ {player['name']} — retrying in 10s...")
+                    import time as _time
+                    _time.sleep(10)
                     ok = self._call_scraper(player["slug"], 0, out_path)
-
                 if ok:
                     with open(out_path) as f:
                         p_data = json.load(f)
@@ -178,34 +168,31 @@ class TennisAbstractScraper(BaseScraper):
                     if players:
                         all_players.extend(players)
                         scraped_slugs.add(player["slug"])
-                        print(f"  ✅ {player['name']}")
-                        continue
-
-                # Failed after retry
+                    print(f" ✅ {player['name']}")
+                    continue
                 if is_optional:
                     soft_warns.append(player["name"])
-                    print(f"  ⚠️  {player['name']} — failed after retry, skipped")
+                    print(f" ⚠️ {player['name']} — failed after retry, skipped")
                 else:
                     hard_errors.append(player["name"])
-                    print(f"  ❌ {player['name']} — failed after retry, hard error")
+                    print(f" ❌ {player['name']} — failed after retry, hard error")
 
         if soft_warns:
             print(f"\n[TennisAbstract] Skipped: {', '.join(soft_warns)}")
         if hard_errors:
             print(f"[TennisAbstract] ❌ Failed: {', '.join(hard_errors)}")
 
-        # ── Write merged file ─────────────────────────────────────────────────
+        # ── Write merged file ───────────────────────────────────────────────
         merged_path = f"{out_dir}/players_{ts_str}.json"
         merged = {
             "lastUpdated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             "playerCount": len(all_players),
-            "players":     all_players,
-            "errors":      hard_errors,
-            "warnings":    soft_warns,
+            "players": all_players,
+            "errors": hard_errors,
+            "warnings": soft_warns,
         }
         with open(merged_path, "w") as f:
             json.dump(merged, f, indent=2)
-
         self._raw_path = merged_path
         return {"path": merged_path, "data": merged}
 
@@ -225,24 +212,32 @@ class TennisAbstractScraper(BaseScraper):
             try:
                 valid.append(WtaPlayer(**r).model_dump())
             except Exception as e:
-                print(f"  [Validation Skip] {r.get('name', 'unknown')}: {e}")
+                print(f" [Validation Skip] {r.get('name', 'unknown')}: {e}")
         return valid
 
     def upsert(self, records):
         storage = StorageManager(self.config["bucket"])
-
         raw_path = getattr(self, "_raw_path", None)
+
         if raw_path and os.path.exists(raw_path):
             date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            ts_str   = datetime.now(timezone.utc).strftime("%H%M%S")
-            gcs_raw  = f"raw/tennisabstract/{date_str}/players_{ts_str}.json"
+            ts_str = datetime.now(timezone.utc).strftime("%H%M%S")
+            gcs_raw = f"raw/tennisabstract/{date_str}/players_{ts_str}.json"
             storage.write_raw_file(gcs_raw, raw_path)
-            print(f"  [TennisAbstract] Raw → gs://{self.config['bucket']}/{gcs_raw}")
+            print(f" [TennisAbstract] Raw → gs://{self.config['bucket']}/{gcs_raw}")
 
+        now = datetime.now(timezone.utc).isoformat()
         payload = {
-            "updated":      datetime.now(timezone.utc).isoformat(),
+            # Standard envelope — schema_version 1
+            "schema_version": 1,
+            "generated_at": now,
+            "scraper_key": "tennisabstract",
+            "record_count": len(records),
+            "warnings": [],  # TODO: propagate scraper warnings here
+            # Existing fields — unchanged
+            "updated": now,
             "player_count": len(records),
-            "players":      records,
+            "players": records,
         }
         url = storage.write_json(self.config["gcs_object"], payload)
-        print(f"  [TennisAbstract] Output → {url}")
+        print(f" [TennisAbstract] Output → {url}")

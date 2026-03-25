@@ -52,6 +52,13 @@ class StatcastPitcherRecord(BaseModel):
 
 
 class StatcastPitchersSnapshot(BaseModel):
+    # Standard envelope — schema_version 1
+    schema_version: int = 1
+    generated_at: str
+    scraper_key: str = "mlb_statcast_pitchers"
+    record_count: int
+    warnings: list[str] = []
+    # Existing fields — unchanged
     updated: str
     season: int
     pitcher_count: int
@@ -89,12 +96,8 @@ def _normalize_name(raw: str) -> str:
 
 def _fetch_csv(season: int, player_type: str, min_pa: int) -> list[dict]:
     params = {
-        "type": player_type,
-        "year": season,
-        "position": "",
-        "team": "",
-        "min_pa": str(min_pa),
-        "csv": "true",
+        "type": player_type, "year": season,
+        "position": "", "team": "", "min_pa": str(min_pa), "csv": "true",
     }
     headers = {
         "User-Agent": (
@@ -103,18 +106,15 @@ def _fetch_csv(season: int, player_type: str, min_pa: int) -> list[dict]:
         ),
         "Referer": "https://baseballsavant.mlb.com/leaderboard/expected_statistics",
     }
-
     logger.info("Fetching Baseball Savant %s leaderboard season=%d", player_type, season)
     resp = requests.get(SAVANT_URL, params=params, headers=headers, timeout=30)
     resp.raise_for_status()
-
     content = resp.text.strip()
     if not content or content.startswith("<"):
         raise RuntimeError(
             f"Baseball Savant returned non-CSV response for {player_type}. "
             "Possible Cloudflare block or page change."
         )
-
     rows = list(csv.DictReader(io.StringIO(content)))
     if not rows:
         logger.warning("Baseball Savant: no rows for type=%s", player_type)
@@ -141,9 +141,7 @@ def _parse_row(row: dict, season: int, fetched_at: str) -> dict:
     )
     return {
         "player_id": row.get("player_id") or None,
-        "name": name,
-        "team": team,
-        "season": season,
+        "name": name, "team": team, "season": season,
         "pa": _int(row.get("pa")),
         "xera": _float(row.get("p_era") or row.get("xera") or row.get("est_era")),
         "xba": _float(row.get("est_ba") or row.get("xba")),
@@ -155,8 +153,7 @@ def _parse_row(row: dict, season: int, fetched_at: str) -> dict:
         "barrel_pct": _float(row.get("barrel_batted_rate") or row.get("barrel_pct")),
         "hard_hit_pct": _float(row.get("hard_hit_percent")),
         "avg_exit_velocity": _float(row.get("exit_velocity_avg")),
-        "source": SOURCE,
-        "fetched_at": fetched_at,
+        "source": SOURCE, "fetched_at": fetched_at,
     }
 
 
@@ -165,10 +162,6 @@ def _parse_row(row: dict, season: int, fetched_at: str) -> dict:
 # ---------------------------------------------------------------------------
 
 class StatcastPitchersScraper(BaseScraper):
-    """
-    Fetches Baseball Savant expected-stats leaderboard for pitchers.
-    Returns list[dict] from parse() — compliant with BaseScraper/ScraperRunner contract.
-    """
 
     def _get_season(self) -> int:
         return int(self.config.get("season", datetime.now(timezone.utc).year))
@@ -189,21 +182,16 @@ class StatcastPitchersScraper(BaseScraper):
         season = raw["season"]
         fetched_at = datetime.now(timezone.utc).isoformat()
         rows = raw.get("rows", [])
-
         if not rows:
             logger.warning("Statcast pitchers: no rows returned")
             return []
-
-        # Verify presence of structural columns that cannot alias.
         _verify_columns(rows, required={"pa", "player_id"}, context="pitcher")
-
         records = []
         for row in rows:
             try:
                 records.append(_parse_row(row, season, fetched_at))
             except Exception as e:
                 logger.warning("Statcast pitcher row skipped: %s | id=%s", e, row.get("player_id"))
-
         logger.info("Parsed %d statcast pitcher records", len(records))
         return records
 
@@ -220,14 +208,14 @@ class StatcastPitchersScraper(BaseScraper):
         season = self._get_season()
         sm = StorageManager(self.config["bucket"])
         fetched_at = datetime.now(timezone.utc).isoformat()
-
         payload = StatcastPitchersSnapshot(
+            generated_at=fetched_at,
+            record_count=len(validated),
             updated=fetched_at,
             season=season,
             pitcher_count=len(validated),
             pitchers=validated,
         ).model_dump(mode="json")
-
         sm.persist_raw(source="mlb_statcast_pitchers", data=payload)
         sm.write_json(blob_name=self.config["gcs_object"], data=payload)
         logger.info("Wrote mlb/statcast_pitchers.json (%d pitchers)", len(validated))

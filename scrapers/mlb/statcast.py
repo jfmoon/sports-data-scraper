@@ -1,3 +1,8 @@
+# RETIRED: 2025-11-01
+# Reason: parse() returned a grouped dict, violating the BaseScraper list[dict] contract.
+# Replaced by: scrapers/mlb/statcast_pitchers.py and scrapers/mlb/statcast_hitters.py
+# Safe to move to _deprecated/: 2026-06-01
+
 """
 scrapers/mlb/statcast.py — RETIRED
 

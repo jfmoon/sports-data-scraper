@@ -3,33 +3,27 @@ scrapers/nhl/natural_stat_trick.py
 
 Natural Stat Trick (NST) scraper.
 Produces: nhl/team_splits.json, nhl/player_splits.json
-Reserves:  nhl/nst_lines.json (future — line report fetch not yet implemented)
+Reserves: nhl/nst_lines.json (future)
 
 GCS path ownership:
-  nhl/lines.json      → DailyFaceoffScraper (do NOT write here)
-  nhl/nst_lines.json  → this scraper (future use)
+  nhl/lines.json        → DailyFaceoffScraper (do NOT write here)
+  nhl/nst_lines.json    → this scraper (future use)
   nhl/team_splits.json, nhl/player_splits.json → this scraper
 
-Review history:
-  Round 1 (Gemini): initial implementation
-  Round 2 (Claude): path collision resolved — nhl/lines.json → nhl/nst_lines.json (Bug 2);
-                    SHA-256 content_key (Bug 5)
-  Round 3 (both):   confirmed correct
-
 BROWSER REQUIREMENT (confirmed 2026-03-25):
-  naturalstattrick.com serves a Cloudflare JS challenge — requests returns
-  an empty page with window.__CF$cv$params instead of the data table.
-  This is identical to barttorvik.com behavior.
-
+  naturalstattrick.com serves a Cloudflare JS challenge — requests returns an
+  empty page. This is identical to barttorvik.com behavior.
   Current fetch() uses requests and will get empty responses (0 records).
   Full fix requires the wrapper + standalone Playwright split:
     natural_stat_trick.py          (this file — framework wrapper)
     natural_stat_trick_scraper.py  (standalone Playwright, visible browser)
   following the pattern of torvik_scraper.py / kenpom_scraper.py.
 
-  The fetch() method below is a stub that will return empty data until
-  natural_stat_trick_scraper.py is implemented. NST data is supplementary
-  (MoneyPuck covers the same metrics) so this does not block production.
+Review history:
+  Round 1 (Gemini): initial implementation
+  Round 2 (Claude): path collision resolved — nhl/lines.json → nhl/nst_lines.json (Bug 2);
+                    SHA-256 content_key (Bug 5)
+  Round 3 (both): confirmed correct
 """
 
 from __future__ import annotations
@@ -56,16 +50,12 @@ from scrapers.nhl.names import (
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
 NST_BASE = "https://www.naturalstattrick.com"
 DEFAULT_TIMEOUT = 25
 MAX_RETRIES = 3
 BACKOFF_BASE = 2.0
 RATE_LIMIT_DELAY = 1.5
 USER_AGENT = "sports-data-scraper/1.0 (github.com/jfmoon/sports-data-scraper)"
-
 SITUATION_ALL = "all"
 SITUATION_5V5 = "5v5"
 
@@ -77,8 +67,8 @@ SITUATION_5V5 = "5v5"
 class NhlTeamSplit(BaseModel):
     team: str
     season: str
-    split_type: str                  # "full_season" | "last_10" | "home" | "away"
-    situation: str                   # "all" | "5v5"
+    split_type: str
+    situation: str
     games_played: int | None = None
     toi: float | None = None
     cf_pct: float | None = None
@@ -137,9 +127,7 @@ def _safe_int(val: str | None) -> int | None:
 
 
 def _get_with_retry(
-    session: requests.Session,
-    url: str,
-    timeout: int = DEFAULT_TIMEOUT,
+    session: requests.Session, url: str, timeout: int = DEFAULT_TIMEOUT,
     params: dict | None = None,
 ) -> requests.Response:
     for attempt in range(1, MAX_RETRIES + 1):
@@ -156,11 +144,10 @@ def _get_with_retry(
                 attempt, MAX_RETRIES, wait, url, exc,
             )
             time.sleep(wait)
-    raise RuntimeError("unreachable")  # pragma: no cover
+    raise RuntimeError("unreachable")
 
 
 def _season_str(year: int) -> str:
-    """2025 → '20252026' (NST season format)."""
     return f"{year}{year + 1}"
 
 
@@ -169,50 +156,28 @@ def _parse_nst_table(
     table_id: str | None = None,
     required_headers: list[str] | None = None,
 ) -> list[dict]:
-    """Parse an NST HTML stats table to a list of row dicts.
-
-    Args:
-        soup:             Parsed page soup.
-        table_id:         If provided, find <table id=...> first, then fall back
-                          to first table.
-        required_headers: If provided, only accept a table whose <thead> contains
-                          ALL of these header strings. Prevents silently parsing
-                          the wrong table when NST layout adds new tables before
-                          the main stats table.
-
-    Returns:
-        List of dicts keyed by header text. Empty list if no qualifying table found.
-    """
     candidates: list = []
     if table_id:
         t = soup.find("table", {"id": table_id})
         if t:
             candidates = [t]
-
     if not candidates:
         candidates = soup.find_all("table")
-
     for table in candidates:
         headers = [th.get_text(strip=True) for th in table.select("thead th")]
-
-        # If required_headers specified, skip tables that don't contain them all
         if required_headers:
             headers_lower = {h.lower() for h in headers}
             if not all(rh.lower() in headers_lower for rh in required_headers):
                 continue
-
         if not headers:
             continue
-
         records = []
         for row in table.select("tbody tr"):
             cells = [td.get_text(strip=True) for td in row.select("td")]
             if len(cells) >= len(headers):
                 records.append(dict(zip(headers, cells)))
-
         if records:
             return records
-
     if required_headers:
         logger.warning(
             "NST: no table found with required headers %s — page structure may have changed",
@@ -226,13 +191,6 @@ def _parse_nst_table(
 # ---------------------------------------------------------------------------
 
 class NaturalStatTrickScraper(BaseScraper):
-    """Scrapes Natural Stat Trick for team splits and player splits.
-
-    Produces: nhl/team_splits.json, nhl/player_splits.json
-    Reserves:  nhl/nst_lines.json (future line report fetch)
-
-    Does NOT write to nhl/lines.json — that path is owned by DailyFaceoffScraper.
-    """
 
     def _session(self) -> requests.Session:
         s = requests.Session()
@@ -246,15 +204,8 @@ class NaturalStatTrickScraper(BaseScraper):
     def _season_year(self) -> int:
         return int(self.config.get("season", datetime.now(timezone.utc).year - 1))
 
-    # ----- fetch ------------------------------------------------------------
-
     def fetch(self) -> dict:
-        session = self._session()
         season = _season_str(self._season_year())
-        # NST is behind a Cloudflare JS challenge — requests cannot get through.
-        # fetch() returns empty raw dict. NST will produce 0 records until
-        # natural_stat_trick_scraper.py (Playwright) is implemented.
-        # See module docstring for full context.
         logger.warning(
             "NST: naturalstattrick.com requires a visible browser (Cloudflare JS challenge). "
             "Returning empty fetch result. Implement natural_stat_trick_scraper.py to enable. "
@@ -269,20 +220,7 @@ class NaturalStatTrickScraper(BaseScraper):
         raw["player_table_5v5_url"] = f"{NST_BASE}/playertable.php"
         return raw
 
-
-
-    # ----- content_key ------------------------------------------------------
-
     def content_key(self, raw: dict) -> Any:
-        """SHA-256 hash of full HTML payload for all three fetched tables.
-
-        Hashing the full payload prevents missing data changes that occur
-        below the first few hundred characters of each page (e.g. updated
-        stats for teams/players listed deep in the table).
-
-        json.dumps with sort_keys=True and separators=(',',':') produces
-        a deterministic, whitespace-free serialization safe for str/None values.
-        """
         serialized = json.dumps({
             "season": raw.get("season", ""),
             "team_5v5": raw.get("team_table_5v5") or "",
@@ -291,24 +229,14 @@ class NaturalStatTrickScraper(BaseScraper):
         }, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
-    # ----- parse teams ------------------------------------------------------
-
     def _parse_team_table(
-        self,
-        html: str | None,
-        situation: str,
-        split_type: str,
-        season: str,
-        url: str,
-        fetched_at: str,
+        self, html: str | None, situation: str, split_type: str,
+        season: str, url: str, fetched_at: str,
     ) -> list[dict]:
         if not html:
             return []
         soup = BeautifulSoup(html, "lxml")
-        # Required headers guard against silently parsing the wrong table
-        rows = _parse_nst_table(
-            soup, required_headers=["Team", "GP", "CF%"]
-        )
+        rows = _parse_nst_table(soup, required_headers=["Team", "GP", "CF%"])
         records = []
         for row in rows:
             team_raw = row.get("Team", "") or row.get("team", "")
@@ -319,17 +247,11 @@ class NaturalStatTrickScraper(BaseScraper):
             except Exception:
                 logger.warning("NST team parse: unrecognized team %r", team_raw)
                 team = team_raw
-
             gp = _safe_int(row.get("GP") or row.get("Games"))
             toi = _safe_float(row.get("TOI") or row.get("Ice Time"))
-
             records.append({
-                "team": team,
-                "season": season,
-                "split_type": split_type,
-                "situation": situation,
-                "games_played": gp,
-                "toi": toi,
+                "team": team, "season": season, "split_type": split_type,
+                "situation": situation, "games_played": gp, "toi": toi,
                 "cf_pct": _safe_float(row.get("CF%")),
                 "ff_pct": _safe_float(row.get("FF%")),
                 "xgf_pct": _safe_float(row.get("xGF%") or row.get("Expected Goals %")),
@@ -340,56 +262,38 @@ class NaturalStatTrickScraper(BaseScraper):
                 "save_pct": _safe_float(row.get("Sv%")),
                 "pdo": _safe_float(row.get("PDO")),
                 "hd_cf_pct": _safe_float(row.get("HDCF%") or row.get("High Danger CF%")),
-                "source": "natural_stat_trick",
-                "source_url": url,
-                "fetched_at": fetched_at,
+                "source": "natural_stat_trick", "source_url": url, "fetched_at": fetched_at,
             })
         return records
 
-    # ----- parse players ----------------------------------------------------
-
     def _parse_player_table(
-        self,
-        html: str | None,
-        situation: str,
-        split_type: str,
-        season: str,
-        url: str,
-        fetched_at: str,
+        self, html: str | None, situation: str, split_type: str,
+        season: str, url: str, fetched_at: str,
     ) -> list[dict]:
         if not html:
             return []
         soup = BeautifulSoup(html, "lxml")
-        rows = _parse_nst_table(
-            soup, required_headers=["Player", "Position", "GP"]
-        )
+        rows = _parse_nst_table(soup, required_headers=["Player", "Position", "GP"])
         records = []
         for row in rows:
             name_raw = row.get("Player", "") or row.get("Name", "")
             if not name_raw:
                 continue
             name_display = normalize_player_display(name_raw)
-
             team_raw = row.get("Team", "") or row.get("team", "")
             try:
                 team = to_canonical(team_raw)
             except Exception:
                 team = team_raw
-
             gp = _safe_int(row.get("GP") or row.get("Games"))
             toi = _safe_float(row.get("TOI"))
             toi_per_game = (toi / gp) if (toi and gp) else None
-
             records.append({
                 "player_name": name_display,
                 "player_name_norm": normalize_player_name(name_display),
-                "team": team,
-                "position": row.get("Position", "") or row.get("Pos", ""),
-                "season": season,
-                "split_type": split_type,
-                "situation": situation,
-                "games_played": gp,
-                "toi": toi,
+                "team": team, "position": row.get("Position", "") or row.get("Pos", ""),
+                "season": season, "split_type": split_type, "situation": situation,
+                "games_played": gp, "toi": toi,
                 "toi_per_game": round(toi_per_game, 2) if toi_per_game else None,
                 "goals": _safe_int(row.get("G") or row.get("Goals")),
                 "assists": _safe_int(row.get("A") or row.get("Assists") or row.get("A1")),
@@ -397,20 +301,15 @@ class NaturalStatTrickScraper(BaseScraper):
                 "cf_pct": _safe_float(row.get("CF%")),
                 "xgf_pct": _safe_float(row.get("xGF%")),
                 "ixg": _safe_float(row.get("ixG") or row.get("iSCF")),
-                "source": "natural_stat_trick",
-                "source_url": url,
-                "fetched_at": fetched_at,
+                "source": "natural_stat_trick", "source_url": url, "fetched_at": fetched_at,
             })
         return records
-
-    # ----- parse (main) -----------------------------------------------------
 
     def parse(self, raw: dict) -> list[dict]:
         fetched_at = self._fetched_at()
         season = raw["season"]
         team_splits: list[dict] = []
         player_splits: list[dict] = []
-
         team_splits.extend(self._parse_team_table(
             raw.get("team_table_5v5"), "5v5", "full_season", season,
             raw.get("team_table_5v5_url", ""), fetched_at,
@@ -423,13 +322,10 @@ class NaturalStatTrickScraper(BaseScraper):
             raw.get("player_table_5v5"), "5v5", "full_season", season,
             raw.get("player_table_5v5_url", ""), fetched_at,
         ))
-
         return [
             {"_type": "team_splits", "records": team_splits},
             {"_type": "player_splits", "records": player_splits},
         ]
-
-    # ----- validate ---------------------------------------------------------
 
     def validate(self, records: list[dict]) -> list[BaseModel]:
         validated: list[BaseModel] = []
@@ -442,8 +338,6 @@ class NaturalStatTrickScraper(BaseScraper):
                     validated.append(NhlPlayerSplit(**r))
         return validated
 
-    # ----- upsert -----------------------------------------------------------
-
     def upsert(self, records: list[BaseModel]) -> None:
         storage = StorageManager(self.config["bucket"])
         fetched_at = self._fetched_at()
@@ -454,8 +348,16 @@ class NaturalStatTrickScraper(BaseScraper):
 
         if team_splits:
             ts_payload = {
-                "updated": fetched_at, "season": season,
-                "record_count": len(team_splits), "team_splits": team_splits,
+                # Standard envelope — schema_version 1
+                "schema_version": 1,
+                "generated_at": fetched_at,
+                "scraper_key": "natural_stat_trick",
+                "record_count": len(team_splits),
+                "warnings": [],  # TODO: propagate scraper warnings here
+                # Existing fields — unchanged
+                "updated": fetched_at,
+                "season": season,
+                "team_splits": team_splits,
             }
             storage.persist_raw(source="nst_team_splits", data=ts_payload)
             ts_gcs = self.config.get("team_splits_gcs_object", "nhl/team_splits.json")
@@ -464,8 +366,16 @@ class NaturalStatTrickScraper(BaseScraper):
 
         if player_splits:
             ps_payload = {
-                "updated": fetched_at, "season": season,
-                "record_count": len(player_splits), "player_splits": player_splits,
+                # Standard envelope — schema_version 1
+                "schema_version": 1,
+                "generated_at": fetched_at,
+                "scraper_key": "natural_stat_trick",
+                "record_count": len(player_splits),
+                "warnings": [],  # TODO: propagate scraper warnings here
+                # Existing fields — unchanged
+                "updated": fetched_at,
+                "season": season,
+                "player_splits": player_splits,
             }
             storage.persist_raw(source="nst_player_splits", data=ps_payload)
             ps_gcs = self.config.get("player_splits_gcs_object", "nhl/player_splits.json")

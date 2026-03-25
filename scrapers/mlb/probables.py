@@ -3,7 +3,6 @@ scrapers/mlb/probables.py
 
 Scrapes MLB probable starters from the official MLB Stats API.
 Endpoint: https://statsapi.mlb.com/api/v1/schedule
-
 Output: mlb/probables.json
 Schema: one record per scheduled game for today + next 2 days.
 """
@@ -32,7 +31,6 @@ SCHEDULE_PARAMS = {
         "probablePitcher,id,fullName,pitchHand,code"
     ),
 }
-
 SOURCE = "mlb_stats_api"
 
 
@@ -69,6 +67,13 @@ class ProbablePitcherRecord(BaseModel):
 
 
 class ProbablesSnapshot(BaseModel):
+    # Standard envelope — schema_version 1
+    schema_version: int = 1
+    generated_at: str
+    scraper_key: str = "mlb_probables"
+    record_count: int
+    warnings: list[str] = []
+    # Existing fields — unchanged
     updated: str
     game_count: int
     games: list[ProbablePitcherRecord]
@@ -84,13 +89,9 @@ def _parse_pitcher(pitcher_dict: Optional[dict]) -> tuple[
     """
     Extract (name, hand_code, pitcher_id, is_confirmed) from a probablePitcher dict.
     Returns (None, None, None, False) when no pitcher listed.
-    'Confirmed' here means the pitcher is listed at all — MLB doesn't expose a
-    separate confirmed flag at this endpoint; the presence of a probable IS the
-    confirmation signal. Absent entries are explicitly False.
     """
     if not pitcher_dict:
         return None, None, None, False
-
     name = pitcher_dict.get("fullName") or pitcher_dict.get("name")
     pid = pitcher_dict.get("id")
     hand = None
@@ -99,7 +100,6 @@ def _parse_pitcher(pitcher_dict: Optional[dict]) -> tuple[
         hand = ph.get("code")
     elif isinstance(ph, str):
         hand = ph
-
     return name, hand, pid, bool(name)
 
 
@@ -114,56 +114,43 @@ def _team_name_from_dict(team_dict: dict) -> str:
 # ---------------------------------------------------------------------------
 
 class MlbProbablesScraper(BaseScraper):
-    """
-    Fetches today + next 2 days of MLB probable starters from MLB Stats API.
-    Covers the typical sportsbook betting window without over-fetching.
-    Extend the date range via config['days_ahead'] if needed.
-    """
 
     def fetch(self) -> dict:
         days_ahead = int(self.config.get("days_ahead", 2))
         today = datetime.now(timezone.utc).date()
         end_date = today + timedelta(days=days_ahead)
-
         params = {
             **SCHEDULE_PARAMS,
             "startDate": today.strftime("%Y-%m-%d"),
             "endDate": end_date.strftime("%Y-%m-%d"),
         }
-
         logger.info("Fetching MLB schedule %s → %s", today, end_date)
         resp = requests.get(MLB_SCHEDULE_URL, params=params, timeout=15)
         resp.raise_for_status()
         data = resp.json()
-
         if "dates" not in data:
             raise RuntimeError(
                 f"MLB schedule response missing 'dates' key. "
                 f"Got keys: {list(data.keys())}"
             )
-
         return data
 
     def content_key(self, raw: dict) -> str:
-        """
-        Hash on game IDs + pitcher IDs only — ignores volatile timestamps
-        so re-fetches with unchanged probables don't trigger downstream jobs.
-        """
         games = []
         for date_entry in raw.get("dates", []):
             for game in date_entry.get("games", []):
                 gid = game.get("gamePk", "")
                 away_p = (
                     game.get("teams", {})
-                        .get("away", {})
-                        .get("probablePitcher", {})
-                        .get("id")
+                    .get("away", {})
+                    .get("probablePitcher", {})
+                    .get("id")
                 )
                 home_p = (
                     game.get("teams", {})
-                        .get("home", {})
-                        .get("probablePitcher", {})
-                        .get("id")
+                    .get("home", {})
+                    .get("probablePitcher", {})
+                    .get("id")
                 )
                 games.append(f"{gid}:{away_p}:{home_p}")
         return "|".join(sorted(games))
@@ -171,23 +158,18 @@ class MlbProbablesScraper(BaseScraper):
     def parse(self, raw: dict) -> list[dict]:
         fetched_at = datetime.now(timezone.utc).isoformat()
         records = []
-
         for date_entry in raw.get("dates", []):
             date_str = date_entry.get("date", "")
             for game in date_entry.get("games", []):
                 game_pk = game.get("gamePk")
                 game_date = game.get("gameDate", "")
                 teams = game.get("teams", {})
-
                 away_team_str = _team_name_from_dict(teams.get("away", {}))
                 home_team_str = _team_name_from_dict(teams.get("home", {}))
-
                 away_probable = teams.get("away", {}).get("probablePitcher")
                 home_probable = teams.get("home", {}).get("probablePitcher")
-
                 away_name, away_hand, away_id, away_confirmed = _parse_pitcher(away_probable)
                 home_name, home_hand, home_id, home_confirmed = _parse_pitcher(home_probable)
-
                 record = {
                     "game_id": str(game_pk) if game_pk else f"{date_str}_{away_team_str}_{home_team_str}",
                     "date": date_str,
@@ -206,7 +188,6 @@ class MlbProbablesScraper(BaseScraper):
                     "fetched_at": fetched_at,
                 }
                 records.append(record)
-
         logger.info("Parsed %d MLB probable games", len(records))
         return records
 
@@ -222,13 +203,13 @@ class MlbProbablesScraper(BaseScraper):
     def upsert(self, validated: list[ProbablePitcherRecord]) -> None:
         sm = StorageManager(self.config["bucket"])
         fetched_at = datetime.now(timezone.utc).isoformat()
-
         payload = ProbablesSnapshot(
+            generated_at=fetched_at,
+            record_count=len(validated),
             updated=fetched_at,
             game_count=len(validated),
             games=validated,
         ).model_dump(mode="json")
-
         sm.persist_raw(source="mlb_probables", data=payload)
         sm.write_json(blob_name=self.config["gcs_object"], data=payload)
         logger.info("Wrote mlb/probables.json (%d games)", len(validated))

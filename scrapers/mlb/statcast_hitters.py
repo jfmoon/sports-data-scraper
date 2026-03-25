@@ -56,6 +56,13 @@ class StatcastHitterRecord(BaseModel):
 
 
 class StatcastHittersSnapshot(BaseModel):
+    # Standard envelope — schema_version 1
+    schema_version: int = 1
+    generated_at: str
+    scraper_key: str = "mlb_statcast_hitters"
+    record_count: int
+    warnings: list[str] = []
+    # Existing fields — unchanged
     updated: str
     season: int
     hitter_count: int
@@ -74,9 +81,7 @@ def _parse_row(row: dict, season: int, fetched_at: str) -> dict:
     )
     return {
         "player_id": row.get("player_id") or None,
-        "name": name,
-        "team": team,
-        "season": season,
+        "name": name, "team": team, "season": season,
         "pa": _int(row.get("pa")),
         "xba": _float(row.get("est_ba") or row.get("xba")),
         "xslg": _float(row.get("est_slg") or row.get("xslg")),
@@ -87,8 +92,7 @@ def _parse_row(row: dict, season: int, fetched_at: str) -> dict:
         "whiff_pct": _float(row.get("whiff_percent")),
         "k_pct": _float(row.get("k_percent")),
         "bb_pct": _float(row.get("bb_percent")),
-        "source": SOURCE,
-        "fetched_at": fetched_at,
+        "source": SOURCE, "fetched_at": fetched_at,
     }
 
 
@@ -97,10 +101,6 @@ def _parse_row(row: dict, season: int, fetched_at: str) -> dict:
 # ---------------------------------------------------------------------------
 
 class StatcastHittersScraper(BaseScraper):
-    """
-    Fetches Baseball Savant expected-stats leaderboard for hitters.
-    Returns list[dict] from parse() — compliant with BaseScraper/ScraperRunner contract.
-    """
 
     def _get_season(self) -> int:
         return int(self.config.get("season", datetime.now(timezone.utc).year))
@@ -121,20 +121,16 @@ class StatcastHittersScraper(BaseScraper):
         season = raw["season"]
         fetched_at = datetime.now(timezone.utc).isoformat()
         rows = raw.get("rows", [])
-
         if not rows:
             logger.warning("Statcast hitters: no rows returned")
             return []
-
         _verify_columns(rows, required={"pa", "player_id"}, context="hitter")
-
         records = []
         for row in rows:
             try:
                 records.append(_parse_row(row, season, fetched_at))
             except Exception as e:
                 logger.warning("Statcast hitter row skipped: %s | id=%s", e, row.get("player_id"))
-
         logger.info("Parsed %d statcast hitter records", len(records))
         return records
 
@@ -151,14 +147,14 @@ class StatcastHittersScraper(BaseScraper):
         season = self._get_season()
         sm = StorageManager(self.config["bucket"])
         fetched_at = datetime.now(timezone.utc).isoformat()
-
         payload = StatcastHittersSnapshot(
+            generated_at=fetched_at,
+            record_count=len(validated),
             updated=fetched_at,
             season=season,
             hitter_count=len(validated),
             hitters=validated,
         ).model_dump(mode="json")
-
         sm.persist_raw(source="mlb_statcast_hitters", data=payload)
         sm.write_json(blob_name=self.config["gcs_object"], data=payload)
         logger.info("Wrote mlb/statcast_hitters.json (%d hitters)", len(validated))

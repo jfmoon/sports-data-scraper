@@ -1,5 +1,6 @@
 import requests
 from datetime import datetime, timezone
+
 from base.scraper import BaseScraper
 from base.models import CBBGame
 from base.storage import StorageManager
@@ -7,6 +8,7 @@ from scrapers.cbb.names import to_canonical
 
 
 class ESPNScraper(BaseScraper):
+
     def fetch(self):
         url = "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard"
         res = requests.get(url, timeout=15)
@@ -20,24 +22,27 @@ class ESPNScraper(BaseScraper):
         results = []
         for ev in raw.get("events", []):
             try:
-                comp   = ev["competitions"][0]
+                comp = ev["competitions"][0]
                 t1, t2 = comp["competitors"][0], comp["competitors"][1]
 
                 def clean_score(s):
-                    if s is None or s == "": return None
-                    try: return int(s)
-                    except: return None
+                    if s is None or s == "":
+                        return None
+                    try:
+                        return int(s)
+                    except:
+                        return None
 
                 results.append({
-                    "espn_id":   ev["id"],
-                    "date":      ev["date"][:10],
-                    "state":     ev["status"]["type"]["state"],
+                    "espn_id": ev["id"],
+                    "date": ev["date"][:10],
+                    "state": ev["status"]["type"]["state"],
                     "completed": ev["status"]["type"]["completed"],
-                    "t1_name":   to_canonical(self.resolver.resolve(t1["team"]["displayName"])),
-                    "t1_score":  clean_score(t1.get("score")),
+                    "t1_name": to_canonical(self.resolver.resolve(t1["team"]["displayName"])),
+                    "t1_score": clean_score(t1.get("score")),
                     "t1_winner": t1.get("winner", False),
-                    "t2_name":   to_canonical(self.resolver.resolve(t2["team"]["displayName"])),
-                    "t2_score":  clean_score(t2.get("score")),
+                    "t2_name": to_canonical(self.resolver.resolve(t2["team"]["displayName"])),
+                    "t2_score": clean_score(t2.get("score")),
                     "t2_winner": t2.get("winner", False),
                 })
             except Exception as e:
@@ -49,9 +54,17 @@ class ESPNScraper(BaseScraper):
 
     def upsert(self, records):
         storage = StorageManager(self.config["bucket"])
+        now = datetime.now(timezone.utc).isoformat()
         payload = {
-            "updated":    datetime.now(timezone.utc).isoformat(),
+            # Standard envelope — schema_version 1
+            "schema_version": 1,
+            "generated_at": now,
+            "scraper_key": "espn",
+            "record_count": len(records),
+            "warnings": [],  # TODO: propagate scraper warnings here
+            # Existing fields — unchanged
+            "updated": now,
             "game_count": len(records),
-            "games":      [r.model_dump(mode="json") for r in records]
+            "games": [r.model_dump(mode="json") for r in records],
         }
         storage.write_json(self.config["gcs_object"], payload)

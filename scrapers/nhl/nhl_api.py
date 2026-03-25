@@ -3,13 +3,12 @@ scrapers/nhl/nhl_api.py
 
 Official NHL Stats API scraper.
 Produces: nhl/schedule.json, nhl/standings.json
-
-API base: https://api-web.nhle.com/v1  (public, no auth)
+API base: https://api-web.nhle.com/v1 (public, no auth)
 
 Review history:
   Round 1 (Gemini): initial implementation
   Round 2 (Claude): decouple standings failure from schedule write (Bug 4)
-  Round 3 (both):   catch ValueError from malformed standings JSON (remaining gap)
+  Round 3 (both): catch ValueError from malformed standings JSON (remaining gap)
 """
 
 from __future__ import annotations
@@ -30,7 +29,6 @@ logger = logging.getLogger(__name__)
 NHL_API_BASE = "https://api-web.nhle.com/v1"
 DEFAULT_TIMEOUT = 20
 USER_AGENT = "sports-data-scraper/1.0 (github.com/jfmoon/sports-data-scraper)"
-
 GAME_TYPE_REGULAR = 2
 GAME_TYPE_PLAYOFF = 3
 
@@ -82,7 +80,6 @@ class NhlStandingsTeam(BaseModel):
 # ---------------------------------------------------------------------------
 
 class NhlApiScraper(BaseScraper):
-    """Scrapes official NHL schedule and standings."""
 
     def _session(self) -> requests.Session:
         s = requests.Session()
@@ -98,33 +95,17 @@ class NhlApiScraper(BaseScraper):
         end = today + timedelta(days=days_ahead)
         return today.isoformat(), end.isoformat()
 
-    # ----- fetch ------------------------------------------------------------
-
     def fetch(self) -> dict:
-        """Fetch schedule (hard failure) and standings (soft failure).
-
-        Failure modes:
-          - Schedule HTTP error or JSON decode error → raise immediately.
-            The scraper should abort; there is nothing useful to write.
-          - Standings HTTP error OR malformed JSON → log ERROR, set standings
-            to empty structure, continue. Schedule write proceeds regardless.
-
-        This split matches the Extract-layer principle that a canonical daily
-        schedule snapshot is more critical than standings currency.
-        """
         start_date, end_date = self._game_date_range()
         session = self._session()
-
         schedule_url = f"{NHL_API_BASE}/schedule/{start_date}"
         standings_url = f"{NHL_API_BASE}/standings/now"
 
-        # Schedule — hard failure
         logger.info("NHL API: fetching schedule %s → %s", start_date, end_date)
         sched_resp = session.get(schedule_url, timeout=DEFAULT_TIMEOUT)
         sched_resp.raise_for_status()
-        schedule_raw = sched_resp.json()  # intentionally not caught — malformed schedule = abort
+        schedule_raw = sched_resp.json()
 
-        # Standings — soft failure: catch HTTP errors AND malformed JSON
         standings_raw: dict = {"standings": []}
         standings_ok = False
         try:
@@ -134,8 +115,6 @@ class NhlApiScraper(BaseScraper):
             standings_raw = stand_resp.json()
             standings_ok = bool(standings_raw.get("standings"))
         except (requests.RequestException, ValueError) as exc:
-            # requests.RequestException: HTTP/network failure
-            # ValueError: stand_resp.json() failed on malformed body
             logger.error(
                 "NHL API: standings fetch failed — schedule will still be written. "
                 "Error: %s: %s", type(exc).__name__, exc
@@ -153,15 +132,7 @@ class NhlApiScraper(BaseScraper):
             },
         }
 
-    # ----- content_key ------------------------------------------------------
-
     def content_key(self, raw: dict) -> Any:
-        """Hash key = list of (game_id, gameState, away_score, home_score) tuples.
-
-        Excludes standings — standings-only changes should not re-trigger
-        schedule OBJECT_FINALIZE events downstream.
-        Excludes fetched_at and all envelope fields.
-        """
         games = []
         for week in raw["schedule"].get("gameWeek", []):
             for g in week.get("games", []):
@@ -172,8 +143,6 @@ class NhlApiScraper(BaseScraper):
                     g.get("homeTeam", {}).get("score"),
                 ))
         return games
-
-    # ----- parse helpers ----------------------------------------------------
 
     def _parse_game_status(self, state: str | None) -> str:
         if not state:
@@ -196,8 +165,6 @@ class NhlApiScraper(BaseScraper):
             return "playoff"
         return f"type_{gtype}"
 
-    # ----- parse ------------------------------------------------------------
-
     def parse(self, raw: dict) -> list[dict]:
         fetched_at = self._fetched_at()
         end_date = raw["meta"]["end_date"]
@@ -212,7 +179,6 @@ class NhlApiScraper(BaseScraper):
                 game_type = g.get("gameType", 2)
                 if game_type == 1 and not self.config.get("include_preseason", False):
                     continue
-
                 away_raw = (
                     g.get("awayTeam", {}).get("placeName", {}).get("default", "")
                     or g.get("awayTeam", {}).get("teamName", {}).get("default", "")
@@ -223,10 +189,8 @@ class NhlApiScraper(BaseScraper):
                 )
                 away_full = g.get("awayTeam", {}).get("commonName", {}).get("default") or away_raw
                 home_full = g.get("homeTeam", {}).get("commonName", {}).get("default") or home_raw
-
                 away_team = to_canonical(away_full) if away_full else away_full
                 home_team = to_canonical(home_full) if home_full else home_full
-
                 games_out.append({
                     "game_id": g.get("id"),
                     "season": str(g.get("season", "")),
@@ -277,8 +241,6 @@ class NhlApiScraper(BaseScraper):
             {"_type": "standings", "records": standings_out},
         ]
 
-    # ----- validate ---------------------------------------------------------
-
     def validate(self, records: list[dict]) -> list[BaseModel]:
         validated: list[BaseModel] = []
         for batch in records:
@@ -290,8 +252,6 @@ class NhlApiScraper(BaseScraper):
                     validated.append(NhlStandingsTeam(**r))
         return validated
 
-    # ----- upsert -----------------------------------------------------------
-
     def upsert(self, records: list[BaseModel]) -> None:
         storage = StorageManager(self.config["bucket"])
         fetched_at = self._fetched_at()
@@ -300,6 +260,13 @@ class NhlApiScraper(BaseScraper):
         standings = [r.model_dump() for r in records if isinstance(r, NhlStandingsTeam)]
 
         schedule_payload = {
+            # Standard envelope — schema_version 1
+            "schema_version": 1,
+            "generated_at": fetched_at,
+            "scraper_key": "nhl_api",
+            "record_count": len(games),
+            "warnings": [],  # TODO: propagate scraper warnings here
+            # Existing fields — unchanged
             "updated": fetched_at,
             "game_count": len(games),
             "games": games,
@@ -311,6 +278,13 @@ class NhlApiScraper(BaseScraper):
         standings_gcs = self.config.get("standings_gcs_object", "nhl/standings.json")
         if standings:
             standings_payload = {
+                # Standard envelope — schema_version 1
+                "schema_version": 1,
+                "generated_at": fetched_at,
+                "scraper_key": "nhl_api",
+                "record_count": len(standings),
+                "warnings": [],  # TODO: propagate scraper warnings here
+                # Existing fields — unchanged
                 "updated": fetched_at,
                 "team_count": len(standings),
                 "standings": standings,

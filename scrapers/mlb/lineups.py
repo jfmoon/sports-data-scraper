@@ -1,18 +1,7 @@
 """
 scrapers/mlb/lineups.py
 
-Scrapes projected/confirmed MLB starting lineups.
-Source: MLB Stats API live game feed (official, no auth, stable).
-
-The Stats API exposes lineups under /api/v1.1/game/{gamePk}/feed/live
-once a lineup is submitted. Before submission, no lineup data is present.
-This scraper reflects that honestly — away_confirmed/home_confirmed are False
-when lineup is not yet posted.
-
-Design note: Provider is isolated to _fetch_lineup_for_game() so the source
-can be swapped or augmented (e.g. RotowireLineupProvider) without changing
-the output schema or upsert logic.
-
+Scrapes projected/confirmed MLB starting lineups from the MLB Stats API.
 Output: mlb/lineups.json
 """
 
@@ -31,7 +20,6 @@ logger = logging.getLogger(__name__)
 
 MLB_SCHEDULE_URL = "https://statsapi.mlb.com/api/v1/schedule"
 MLB_GAME_FEED_URL = "https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
-
 SOURCE = "mlb_stats_api"
 
 
@@ -70,6 +58,13 @@ class LineupGame(BaseModel):
 
 
 class LineupsSnapshot(BaseModel):
+    # Standard envelope — schema_version 1
+    schema_version: int = 1
+    generated_at: str
+    scraper_key: str = "mlb_lineups"
+    record_count: int
+    warnings: list[str] = []
+    # Existing fields — unchanged
     updated: str
     game_count: int
     games: list[LineupGame]
@@ -80,12 +75,8 @@ class LineupsSnapshot(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _fetch_game_pks(days_ahead: int) -> list[tuple[str, str, str]]:
-    """
-    Returns list of (game_pk, date_str, game_date_iso) for today + days_ahead.
-    """
     today = datetime.now(timezone.utc).date()
     end_date = today + timedelta(days=days_ahead)
-
     params = {
         "sportId": 1,
         "startDate": today.strftime("%Y-%m-%d"),
@@ -95,7 +86,6 @@ def _fetch_game_pks(days_ahead: int) -> list[tuple[str, str, str]]:
     resp = requests.get(MLB_SCHEDULE_URL, params=params, timeout=15)
     resp.raise_for_status()
     data = resp.json()
-
     games = []
     for date_entry in data.get("dates", []):
         date_str = date_entry.get("date", "")
@@ -107,10 +97,6 @@ def _fetch_game_pks(days_ahead: int) -> list[tuple[str, str, str]]:
 
 
 def _fetch_lineup_for_game(game_pk: str) -> dict:
-    """
-    Fetch live game feed for a single game. Returns the raw lineup section.
-    Returns {} if lineup not yet posted.
-    """
     url = MLB_GAME_FEED_URL.format(game_pk=game_pk)
     resp = requests.get(url, timeout=15)
     if resp.status_code == 404:
@@ -120,37 +106,25 @@ def _fetch_lineup_for_game(game_pk: str) -> dict:
 
 
 def _parse_lineup_side(boxscore_side: dict) -> tuple[list[dict], bool]:
-    """
-    Parse one side (home or away) from the boxscore players section.
-    Returns (lineup_slots, is_confirmed).
-
-    is_confirmed = True when at least one player has battingOrder set.
-    """
     players = boxscore_side.get("players", {})
     if not players:
         return [], False
-
     slots = []
     for _, player_data in players.items():
         batting_order = player_data.get("battingOrder")
         if not batting_order:
             continue
-        # battingOrder is "100", "200", ... (1-indexed × 100, starting lineup)
-        # Bench/subs have orders like "101", "201" — we skip non-clean multiples.
         try:
             order_int = int(batting_order)
             if order_int % 100 != 0:
-                continue  # substitute or mid-inning entry
+                continue
             batting_pos = order_int // 100
         except (ValueError, TypeError):
             continue
-
         person = player_data.get("person", {})
         pos = player_data.get("position", {}).get("abbreviation")
-        stats = player_data.get("stats", {})
         bat_side = player_data.get("batSide", {})
         bats_code = bat_side.get("code") if isinstance(bat_side, dict) else None
-
         slots.append({
             "batting_order": batting_pos,
             "player_name": person.get("fullName") or "",
@@ -158,7 +132,6 @@ def _parse_lineup_side(boxscore_side: dict) -> tuple[list[dict], bool]:
             "position": pos,
             "bats": bats_code,
         })
-
     slots.sort(key=lambda s: s["batting_order"])
     confirmed = len(slots) > 0
     return slots, confirmed
@@ -169,57 +142,28 @@ def _parse_lineup_side(boxscore_side: dict) -> tuple[list[dict], bool]:
 # ---------------------------------------------------------------------------
 
 class LineupsScraper(BaseScraper):
-    """
-    Fetches starting lineups from MLB Stats API live game feeds.
-
-    Iterates over scheduled games and attempts to pull each game's lineup.
-    Games without lineups yet posted return empty lists with confirmed=False.
-
-    This scraper is designed to run frequently near game time. Content-hash
-    dedup prevents redundant downstream triggers when lineups haven't changed.
-
-    config['days_ahead']: how many days forward to fetch (default 1).
-    Lineups are typically only available same-day or day-before.
-    """
 
     def fetch(self) -> dict:
         days_ahead = int(self.config.get("days_ahead", 1))
         game_pks = _fetch_game_pks(days_ahead)
         logger.info("Fetching lineups for %d scheduled games", len(game_pks))
-
         results = []
         for game_pk, date_str, commence_time in game_pks:
             try:
                 feed = _fetch_lineup_for_game(game_pk)
                 results.append({
-                    "game_pk": game_pk,
-                    "date": date_str,
-                    "commence_time": commence_time,
-                    "feed": feed,
+                    "game_pk": game_pk, "date": date_str,
+                    "commence_time": commence_time, "feed": feed,
                 })
             except Exception as e:
                 logger.warning("Failed to fetch lineup for game %s: %s", game_pk, e)
                 results.append({
-                    "game_pk": game_pk,
-                    "date": date_str,
-                    "commence_time": commence_time,
-                    "feed": {},
+                    "game_pk": game_pk, "date": date_str,
+                    "commence_time": commence_time, "feed": {},
                 })
-
         return {"games": results}
 
     def content_key(self, raw: dict) -> str:
-        """
-        Hash on the full ordered list of starter IDs for both lineups.
-
-        Must detect any change to lineup composition or batting order — including
-        mid-order swaps (e.g. flip 4th/5th hitter) and single-player substitutions
-        anywhere in the lineup. Using only a "first ID" proxy misses all of these.
-
-        Encodes game_pk + away starter IDs in batting order + home starter IDs in
-        batting order. Non-starters (no battingOrder or sub entries with order%100!=0)
-        are excluded, matching _parse_lineup_side() logic.
-        """
         parts = []
         for g in raw.get("games", []):
             game_pk = g["game_pk"]
@@ -247,49 +191,34 @@ class LineupsScraper(BaseScraper):
             away_ids = _ordered_ids(boxscore.get("away", {}))
             home_ids = _ordered_ids(boxscore.get("home", {}))
             parts.append(f"{game_pk}|{away_ids}|{home_ids}")
-
         return "||".join(sorted(parts))
 
     def parse(self, raw: dict) -> list[dict]:
         fetched_at = datetime.now(timezone.utc).isoformat()
         records = []
-
         for g in raw.get("games", []):
             game_pk = g["game_pk"]
             date_str = g["date"]
             commence_time = g["commence_time"]
             feed = g.get("feed", {})
-
-            # Extract team names from game data section.
             game_data = feed.get("gameData", {})
             teams_data = game_data.get("teams", {})
-
             away_name_raw = teams_data.get("away", {}).get("name", "")
             home_name_raw = teams_data.get("home", {}).get("name", "")
             away_team = to_canonical(away_name_raw) if away_name_raw else ""
             home_team = to_canonical(home_name_raw) if home_name_raw else ""
-
             boxscore = feed.get("liveData", {}).get("boxscore", {}).get("teams", {})
             away_side = boxscore.get("away", {})
             home_side = boxscore.get("home", {})
-
             away_slots, away_confirmed = _parse_lineup_side(away_side)
             home_slots, home_confirmed = _parse_lineup_side(home_side)
-
             records.append({
-                "game_id": game_pk,
-                "date": date_str,
-                "commence_time": commence_time,
-                "away_team": away_team,
-                "home_team": home_team,
-                "away_confirmed": away_confirmed,
-                "home_confirmed": home_confirmed,
-                "away_lineup": away_slots,
-                "home_lineup": home_slots,
-                "source": SOURCE,
-                "fetched_at": fetched_at,
+                "game_id": game_pk, "date": date_str, "commence_time": commence_time,
+                "away_team": away_team, "home_team": home_team,
+                "away_confirmed": away_confirmed, "home_confirmed": home_confirmed,
+                "away_lineup": away_slots, "home_lineup": home_slots,
+                "source": SOURCE, "fetched_at": fetched_at,
             })
-
         logger.info("Parsed %d lineup records", len(records))
         return records
 
@@ -308,13 +237,13 @@ class LineupsScraper(BaseScraper):
     def upsert(self, validated: list[LineupGame]) -> None:
         sm = StorageManager(self.config["bucket"])
         fetched_at = datetime.now(timezone.utc).isoformat()
-
         payload = LineupsSnapshot(
+            generated_at=fetched_at,
+            record_count=len(validated),
             updated=fetched_at,
             game_count=len(validated),
             games=validated,
         ).model_dump(mode="json")
-
         sm.persist_raw(source="mlb_lineups", data=payload)
         sm.write_json(blob_name=self.config["gcs_object"], data=payload)
         logger.info("Wrote mlb/lineups.json (%d games)", len(validated))

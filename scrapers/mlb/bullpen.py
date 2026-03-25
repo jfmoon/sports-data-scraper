@@ -4,9 +4,6 @@ scrapers/mlb/bullpen.py
 Scrapes team bullpen metrics from Fangraphs.
 Filters to relief-only pitching using the Fangraphs "role" filter (RP/reliever).
 
-Separation from starter metrics is critical for betting models — bullpen
-strength drives late-game run prevention independently of the starter.
-
 Output: mlb/bullpen.json
 """
 
@@ -24,7 +21,6 @@ from scrapers.mlb.names import to_canonical
 logger = logging.getLogger(__name__)
 
 FANGRAPHS_API = "https://www.fangraphs.com/api/leaders/major-league/data"
-
 BULLPEN_STATS = (
     "G,GS,IP,TBF,ERA,FIP,xFIP,SIERA,WHIP,"
     "K%,BB%,K-BB%,K/9,BB/9,"
@@ -34,7 +30,6 @@ BULLPEN_STATS = (
     "AVG,BABIP,LOB%,"
     "SwStr%,Zone%,O-Swing%,Z-Swing%"
 )
-
 SOURCE = "fangraphs"
 
 
@@ -66,6 +61,13 @@ class BullpenRecord(BaseModel):
 
 
 class BullpenSnapshot(BaseModel):
+    # Standard envelope — schema_version 1
+    schema_version: int = 1
+    generated_at: str
+    scraper_key: str = "mlb_bullpen"
+    record_count: int
+    warnings: list[str] = []
+    # Existing fields — unchanged
     updated: str
     team_count: int
     season: int
@@ -98,19 +100,14 @@ def _int(val) -> Optional[int]:
 def _build_record(row: dict, season: int, fetched_at: str) -> dict:
     team_raw = row.get("Team") or row.get("team") or ""
     team = to_canonical(team_raw) if team_raw else team_raw
-
     return {
-        "team": team,
-        "season": season,
+        "team": team, "season": season,
         "innings_pitched": _float(row.get("IP")),
         "games": _int(row.get("G")),
-        "era": _float(row.get("ERA")),
-        "fip": _float(row.get("FIP")),
-        "xfip": _float(row.get("xFIP")),
-        "siera": _float(row.get("SIERA")),
+        "era": _float(row.get("ERA")), "fip": _float(row.get("FIP")),
+        "xfip": _float(row.get("xFIP")), "siera": _float(row.get("SIERA")),
         "whip": _float(row.get("WHIP")),
-        "k_pct": _float(row.get("K%")),
-        "bb_pct": _float(row.get("BB%")),
+        "k_pct": _float(row.get("K%")), "bb_pct": _float(row.get("BB%")),
         "k_minus_bb_pct": _float(row.get("K-BB%")),
         "gb_pct": _float(row.get("GB%")),
         "hard_hit_pct": _float(row.get("Hard%")),
@@ -118,8 +115,7 @@ def _build_record(row: dict, season: int, fetched_at: str) -> dict:
         "hr_per_9": _float(row.get("HR/9")),
         "lob_pct": _float(row.get("LOB%")),
         "swstr_pct": _float(row.get("SwStr%")),
-        "source": SOURCE,
-        "fetched_at": fetched_at,
+        "source": SOURCE, "fetched_at": fetched_at,
     }
 
 
@@ -128,15 +124,6 @@ def _build_record(row: dict, season: int, fetched_at: str) -> dict:
 # ---------------------------------------------------------------------------
 
 class BullpenScraper(BaseScraper):
-    """
-    Fetches team-level bullpen (relief pitching) leaderboard from Fangraphs.
-
-    Uses Fangraphs "starter" = 0 (reliever) filter to isolate RP innings.
-    The 'team=0,ts' parameter aggregates to team level.
-
-    Minimum IP filter (default 20 RP innings) applied to ensure data quality
-    at the start of the season. Adjust via config['min_ip'].
-    """
 
     def _get_season(self) -> int:
         return int(self.config.get("season", datetime.now(timezone.utc).year))
@@ -144,27 +131,14 @@ class BullpenScraper(BaseScraper):
     def fetch(self) -> dict:
         season = self._get_season()
         min_ip = int(self.config.get("min_ip", 20))
-
         params = {
-            "pos": "all",
-            "stats": "rel",   # "rel" = relievers only in Fangraphs API
-            "lg": "all",
-            "qual": str(min_ip),
-            "season": season,
-            "season1": season,
-            "ind": 0,
-            "team": "0,ts",
-            "rost": 0,
-            "age": 0,
-            "filter": "",
+            "pos": "all", "stats": "rel", "lg": "all",
+            "qual": str(min_ip), "season": season, "season1": season,
+            "ind": 0, "team": "0,ts", "rost": 0, "age": 0, "filter": "",
             "players": 0,
-            "startdate": f"{season}-01-01",
-            "enddate": f"{season}-12-31",
-            "columns": BULLPEN_STATS,
-            "pageitems": 50,
-            "pagenum": 1,
+            "startdate": f"{season}-01-01", "enddate": f"{season}-12-31",
+            "columns": BULLPEN_STATS, "pageitems": 50, "pagenum": 1,
         }
-
         headers = {
             "User-Agent": (
                 "Mozilla/5.0 (compatible; sports-data-scraper/1.0; "
@@ -172,17 +146,12 @@ class BullpenScraper(BaseScraper):
             ),
             "Referer": "https://www.fangraphs.com/leaders.aspx",
         }
-
         logger.info("Fetching Fangraphs bullpen leaderboard season=%d", season)
         resp = requests.get(FANGRAPHS_API, params=params, headers=headers, timeout=20)
         resp.raise_for_status()
         data = resp.json()
-
         if "data" not in data:
-            raise RuntimeError(
-                f"Fangraphs bullpen API missing 'data' key. Got: {list(data.keys())}"
-            )
-
+            raise RuntimeError(f"Fangraphs bullpen API missing 'data' key. Got: {list(data.keys())}")
         return data
 
     def content_key(self, raw: dict) -> str:
@@ -195,11 +164,9 @@ class BullpenScraper(BaseScraper):
         season = self._get_season()
         fetched_at = datetime.now(timezone.utc).isoformat()
         rows = raw.get("data", [])
-
         if not rows:
             logger.warning("Fangraphs bullpen: no rows returned — possible off-season or API change")
             return []
-
         first = rows[0]
         required_cols = {"ERA", "IP", "K%", "BB%", "xFIP"}
         missing = required_cols - set(first.keys())
@@ -208,10 +175,8 @@ class BullpenScraper(BaseScraper):
                 f"Fangraphs bullpen response missing columns: {missing}. "
                 f"Available: {set(first.keys())}"
             )
-
         records = []
         for row in rows:
-            # Skip league-average or "- -" rows that Fangraphs sometimes injects.
             team = row.get("Team") or row.get("team") or ""
             if not team or team.lower() in ("avg", "total", "- -", "league"):
                 continue
@@ -219,7 +184,6 @@ class BullpenScraper(BaseScraper):
                 records.append(_build_record(row, season, fetched_at))
             except Exception as e:
                 logger.warning("Bullpen row skipped: %s | team=%s", e, team)
-
         logger.info("Parsed %d team bullpen records", len(records))
         return records
 
@@ -236,15 +200,15 @@ class BullpenScraper(BaseScraper):
         season = self._get_season()
         sm = StorageManager(self.config["bucket"])
         fetched_at = datetime.now(timezone.utc).isoformat()
-
         payload = BullpenSnapshot(
+            generated_at=fetched_at,
+            record_count=len(validated),
             updated=fetched_at,
             team_count=len(validated),
             season=season,
             pitching_role="reliever",
             bullpens=validated,
         ).model_dump(mode="json")
-
         sm.persist_raw(source="mlb_bullpen", data=payload)
         sm.write_json(blob_name=self.config["gcs_object"], data=payload)
         logger.info("Wrote mlb/bullpen.json (%d teams)", len(validated))
