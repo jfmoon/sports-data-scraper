@@ -2025,12 +2025,14 @@
       "name": "Nevada",
       "aliases": [
         "Nevada Wolf Pack",
-        "Nevada"
+        "Nevada",
+        "Nevada(A)"
       ],
       "sources": {
         "espn": "Nevada Wolf Pack",
         "action_network": "Nevada",
-        "kenpom": "Nevada"
+        "kenpom": "Nevada",
+        "torvik": "Nevada"
       }
     },
     {
