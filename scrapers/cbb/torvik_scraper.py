@@ -83,13 +83,16 @@ def _clean_team_name(raw: str) -> str:
     Strip seed info, emoji, and other appended text from the Team cell.
     Example: 'Michigan1 seed, ✅' -> 'Michigan'
     Torvik appends seed/tournament info directly to the team name string.
+    Also strips the away-game marker '(A)' appended in certain table views.
     """
     # Remove anything from the first digit onwards (seed number, emoji, etc.)
     cleaned = re.split(r"\d", raw)[0].strip()
     # Remove any remaining non-ASCII characters
     cleaned = cleaned.encode("ascii", "ignore").decode().strip()
+    # Strip Torvik away-game suffix — appended as "(A)" in certain table views.
+    # This is a display artifact, not part of the team name.
+    cleaned = re.sub(r"\(A\)\s*$", "", cleaned).strip()
     return cleaned
-
 
 # ---------------------------------------------------------------------------
 # Core scrape function
