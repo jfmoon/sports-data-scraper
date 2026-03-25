@@ -109,7 +109,9 @@ _ALIAS_MAP: dict[str, str] = {
     "florida panthers": "Florida Panthers", "florida": "Florida Panthers",
     "panthers": "Florida Panthers", "fla": "Florida Panthers",
     # ── Los Angeles Kings ──────────────────────────────────────────────────
-    "los angeles kings": "Los Angeles Kings", "la kings": "Los Angeles Kings",
+    "los angeles kings": "Los Angeles Kings",
+    "l.a": "Los Angeles Kings",
+    "l.a.": "Los Angeles Kings", "la kings": "Los Angeles Kings",
     "l.a. kings": "Los Angeles Kings", "kings": "Los Angeles Kings",
     "lak": "Los Angeles Kings", "laa": "Los Angeles Kings",
     # ── Minnesota Wild ─────────────────────────────────────────────────────
@@ -118,13 +120,14 @@ _ALIAS_MAP: dict[str, str] = {
     # ── Montreal Canadiens ─────────────────────────────────────────────────
     "montreal canadiens": "Montreal Canadiens", "montreal": "Montreal Canadiens",
     "canadiens": "Montreal Canadiens", "habs": "Montreal Canadiens", "mtl": "Montreal Canadiens",
-    "montréal canadiens": "Montreal Canadiens", "montréal": "Montreal Canadiens",
     # ── Nashville Predators ────────────────────────────────────────────────
     "nashville predators": "Nashville Predators", "nashville": "Nashville Predators",
     "predators": "Nashville Predators", "preds": "Nashville Predators",
     "nsh": "Nashville Predators", "nas": "Nashville Predators",
     # ── New Jersey Devils ──────────────────────────────────────────────────
-    "new jersey devils": "New Jersey Devils", "new jersey": "New Jersey Devils",
+    "new jersey devils": "New Jersey Devils",
+    "n.j": "New Jersey Devils",
+    "n.j.": "New Jersey Devils", "new jersey": "New Jersey Devils",
     "devils": "New Jersey Devils", "njd": "New Jersey Devils", "nj": "New Jersey Devils",
     # ── New York Islanders ─────────────────────────────────────────────────
     "new york islanders": "New York Islanders", "ny islanders": "New York Islanders",
@@ -143,7 +146,9 @@ _ALIAS_MAP: dict[str, str] = {
     "penguins": "Pittsburgh Penguins", "pens": "Pittsburgh Penguins",
     "pit": "Pittsburgh Penguins", "pgh": "Pittsburgh Penguins",
     # ── San Jose Sharks ────────────────────────────────────────────────────
-    "san jose sharks": "San Jose Sharks", "san jose": "San Jose Sharks",
+    "san jose sharks": "San Jose Sharks",
+    "s.j": "San Jose Sharks",
+    "s.j.": "San Jose Sharks", "san jose": "San Jose Sharks",
     "sharks": "San Jose Sharks", "sjs": "San Jose Sharks", "sjo": "San Jose Sharks",
     # ── Seattle Kraken ─────────────────────────────────────────────────────
     "seattle kraken": "Seattle Kraken", "seattle": "Seattle Kraken",
@@ -153,7 +158,9 @@ _ALIAS_MAP: dict[str, str] = {
     "stl blues": "St. Louis Blues", "st. louis": "St. Louis Blues",
     "st louis": "St. Louis Blues", "blues": "St. Louis Blues", "stl": "St. Louis Blues",
     # ── Tampa Bay Lightning ────────────────────────────────────────────────
-    "tampa bay lightning": "Tampa Bay Lightning", "tampa bay": "Tampa Bay Lightning",
+    "tampa bay lightning": "Tampa Bay Lightning",
+    "t.b": "Tampa Bay Lightning",
+    "t.b.": "Tampa Bay Lightning", "tampa bay": "Tampa Bay Lightning",
     "tampa": "Tampa Bay Lightning", "lightning": "Tampa Bay Lightning",
     "bolts": "Tampa Bay Lightning", "tbl": "Tampa Bay Lightning", "tbay": "Tampa Bay Lightning",
     # ── Toronto Maple Leafs ────────────────────────────────────────────────
@@ -161,8 +168,8 @@ _ALIAS_MAP: dict[str, str] = {
     "maple leafs": "Toronto Maple Leafs", "leafs": "Toronto Maple Leafs", "tor": "Toronto Maple Leafs",
     # ── Utah Hockey Club ───────────────────────────────────────────────────
     "utah hockey club": "Utah Hockey Club", "utah": "Utah Hockey Club",
-    "hockey club": "Utah Hockey Club", "uth": "Utah Hockey Club", "uta": "Utah Hockey Club",
     "utah mammoth": "Utah Hockey Club", "mammoth": "Utah Hockey Club",
+    "hockey club": "Utah Hockey Club", "uth": "Utah Hockey Club", "uta": "Utah Hockey Club",
     # formerly Arizona Coyotes — legacy aliases kept for historical data joins
     "arizona coyotes": "Utah Hockey Club", "arizona": "Utah Hockey Club",
     "coyotes": "Utah Hockey Club", "yotes": "Utah Hockey Club",
