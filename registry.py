@@ -15,6 +15,10 @@ from scrapers.mlb.statcast_pitchers import StatcastPitchersScraper
 from scrapers.mlb.statcast_hitters import StatcastHittersScraper
 from scrapers.mlb.weather import WeatherScraper
 from scrapers.mlb.lineups import LineupsScraper
+from scrapers.nhl.nhl_api import NhlApiScraper
+from scrapers.nhl.daily_faceoff import DailyFaceoffScraper
+from scrapers.nhl.moneypuck import MoneypuckScraper
+from scrapers.nhl.natural_stat_trick import NaturalStatTrickScraper
 
 SCRAPER_REGISTRY = {
     # CBB
@@ -41,4 +45,9 @@ SCRAPER_REGISTRY = {
     "mlb_statcast_hitters":  StatcastHittersScraper,
     "mlb_weather":           WeatherScraper,
     "mlb_lineups":           LineupsScraper,
+    # NHL
+    "nhl_api":            NhlApiScraper,
+    "daily_faceoff":      DailyFaceoffScraper,
+    "moneypuck":          MoneypuckScraper,
+    "natural_stat_trick": NaturalStatTrickScraper,
 }

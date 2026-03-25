@@ -2,6 +2,8 @@ groups:
   cbb:         [espn, action_network, kenpom, evanmiya, torvik]
   tennis:      [sofascore, the_odds_api, tennisabstract]
   sports_odds: [nba_odds, mlb_odds, nhl_odds, nfl_odds]
+  mlb:         [mlb_odds, mlb_probables, mlb_pitchers, mlb_teams, mlb_bullpen, mlb_statcast_pitchers, mlb_statcast_hitters, mlb_weather, mlb_lineups]
+  nhl:         [nhl_api, daily_faceoff, moneypuck, natural_stat_trick]
 
 scrapers:
 
@@ -218,3 +220,46 @@ scrapers:
     bucket: sports-data-scraper-491116
     gcs_object: mlb/lineups.json
     days_ahead: 1
+  # ---------------------------------------------------------------------------
+  # NHL
+  # ---------------------------------------------------------------------------
+  nhl_api:
+    name: nhl_api
+    enabled: true
+    sport: nhl
+    bucket: sports-data-scraper-491116
+    gcs_object: nhl/schedule.json
+    standings_gcs_object: nhl/standings.json
+    days_ahead: 2
+    include_preseason: false
+
+  daily_faceoff:
+    name: daily_faceoff
+    enabled: true
+    sport: nhl
+    bucket: sports-data-scraper-491116
+    gcs_object: nhl/goalies.json
+    lines_gcs_object: nhl/lines.json
+    fetch_lines: true
+
+  moneypuck:
+    name: moneypuck
+    enabled: true
+    sport: nhl
+    bucket: sports-data-scraper-491116
+    gcs_object: nhl/team_stats.json
+    team_stats_gcs_object: nhl/team_stats.json
+    goalie_stats_gcs_object: nhl/goalie_stats.json
+    player_stats_gcs_object: nhl/player_stats.json
+    season: 2025
+
+  natural_stat_trick:
+    name: natural_stat_trick
+    enabled: true
+    sport: nhl
+    bucket: sports-data-scraper-491116
+    gcs_object: nhl/nst_lines.json
+    team_splits_gcs_object: nhl/team_splits.json
+    player_splits_gcs_object: nhl/player_splits.json
+    season: 2025
+    recent_splits: true
