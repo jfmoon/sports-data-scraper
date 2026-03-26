@@ -10,13 +10,16 @@ from google.cloud.run_v2.types.k8s_min import EnvVar
 ANALYSIS_PROJECT = os.environ.get("ANALYSIS_PROJECT")
 REGION = os.environ.get("REGION", "us-east4")
 
+if not ANALYSIS_PROJECT:
+    raise RuntimeError("ANALYSIS_PROJECT env var is not set")
+
 # Explicit allowlist — maps GCS path to Cloud Run Job name.
-# Anything not listed here is silently ignored (replaces prefix + raw/ filter).
+# Anything not listed here is silently ignored.
+# tennis/players.json is intentionally excluded — WTA classifier not yet wired.
 ROUTES = {
-    "cbb/kenpom.json":     "cbb-processor",
-    "cbb/odds.json":       "cbb-processor",
-    "tennis/odds.json":    "tennis-processor",
-    "tennis/players.json": "wta-archetype-classifier",
+    "cbb/kenpom.json":  "cbb-processor",
+    "cbb/odds.json":    "cbb-processor",
+    "tennis/odds.json": "tennis-processor",
 }
 
 
@@ -31,6 +34,7 @@ def handler(cloud_event):
     generation = data.get("generation")
 
     job_name = ROUTES.get(file_path)
+
     if not job_name:
         logging.info(f"[{message_id}] Ignored: {file_path}")
         return
